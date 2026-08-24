@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { spawn } from 'node:child_process';
 import { getAppPaths } from '../shared/paths';
+import { fetchWithRetry, executeWithExponentialBackoff } from '../shared/http-util';
 
 export interface PiperStatus {
   voiceName: string; // 'en_US-amy-medium' | 'en_US-lessac-medium' | 'en_GB-alan-medium'
@@ -139,56 +140,74 @@ export async function downloadPiperVoice(
   isDownloading = true;
   currentProgress = 0;
   console.log(`[Piper Download] Starting download for voice "${voiceName}"...`);
+  const targetPath = getVoicePath(voiceName);
+  const tempPath = `${targetPath}.tmp`;
 
   try {
-    // 1. Download JSON config
-    const jsonRes = await fetch(urls.json);
-    if (jsonRes.ok) {
-      const jsonText = await jsonRes.text();
-      const jsonPath = path.join(getVoicesDir(), `${voiceName}.onnx.json`);
-      fs.writeFileSync(jsonPath, jsonText, 'utf-8');
-    }
+    await executeWithExponentialBackoff(
+      async () => {
+        if (fs.existsSync(tempPath)) {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
 
-    // 2. Download ONNX model file
-    const res = await fetch(urls.onnx);
-    if (!res.ok || !res.body) {
-      console.error(`[Piper Download Failed] HTTP ${res.status}: ${res.statusText}`);
-      isDownloading = false;
-      return false;
-    }
+        // 1. Download JSON config
+        const jsonRes = await fetchWithRetry(urls.json, undefined, 2, 1000);
+        if (jsonRes.ok) {
+          const jsonText = await jsonRes.text();
+          const jsonPath = path.join(getVoicesDir(), `${voiceName}.onnx.json`);
+          fs.writeFileSync(jsonPath, jsonText, 'utf-8');
+        }
 
-    const contentLengthHeader = res.headers.get('content-length');
-    const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 55 * 1024 * 1024;
-    let loadedBytes = 0;
+        // 2. Download ONNX model file
+        const res = await fetchWithRetry(urls.onnx, undefined, 2, 1000);
+        if (!res.ok || !res.body) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
 
-    const targetPath = getVoicePath(voiceName);
-    const tempPath = `${targetPath}.tmp`;
-    const fileStream = fs.createWriteStream(tempPath);
+        const contentLengthHeader = res.headers.get('content-length');
+        const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 55 * 1024 * 1024;
+        let loadedBytes = 0;
 
-    const reader = res.body.getReader();
+        const fileStream = fs.createWriteStream(tempPath);
+        const reader = res.body.getReader();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      loadedBytes += value.length;
-      fileStream.write(Buffer.from(value));
+          loadedBytes += value.length;
+          fileStream.write(Buffer.from(value));
 
-      if (totalBytes > 0) {
-        const percent = Math.min(99, Math.round((loadedBytes / totalBytes) * 100));
-        currentProgress = percent;
+          if (totalBytes > 0) {
+            const percent = Math.min(99, Math.round((loadedBytes / totalBytes) * 100));
+            currentProgress = percent;
+            if (onProgress) {
+              onProgress(percent, `Downloading Piper voice ${voiceName}: ${percent}%`);
+            }
+          }
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          fileStream.on('finish', resolve);
+          fileStream.on('error', reject);
+          fileStream.end();
+        });
+
+        if (fs.existsSync(targetPath)) {
+          fs.unlinkSync(targetPath);
+        }
+        fs.renameSync(tempPath, targetPath);
+      },
+      3,
+      1500,
+      (attempt, delayMs, err) => {
+        const warning = `Network glitch downloading Piper voice ${voiceName}. Retrying in ${delayMs / 1000}s (Attempt ${attempt}/3)...`;
+        console.warn(`[Piper Download Retry] ${warning}`, err);
         if (onProgress) {
-          onProgress(percent, `Downloading Piper voice ${voiceName}: ${percent}%`);
+          onProgress(currentProgress, warning);
         }
       }
-    }
-
-    fileStream.end();
-
-    if (fs.existsSync(targetPath)) {
-      fs.unlinkSync(targetPath);
-    }
-    fs.renameSync(tempPath, targetPath);
+    );
 
     currentProgress = 100;
     isDownloading = false;
@@ -199,6 +218,11 @@ export async function downloadPiperVoice(
     return true;
   } catch (err) {
     console.error(`[Piper Download Error] Failed downloading voice ${voiceName}:`, err);
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch {
+      // ignore
+    }
     isDownloading = false;
     return false;
   }
@@ -225,7 +249,7 @@ export async function downloadPiperBinary(): Promise<boolean> {
 
   console.log('[Piper Binary Download] Starting download of Piper executable binary for Windows...');
   try {
-    const res = await fetch(PIPER_WINDOWS_BIN_URL);
+    const res = await fetchWithRetry(PIPER_WINDOWS_BIN_URL, undefined, 3, 1500);
     if (!res.ok || !res.body) {
       console.error(`[Piper Binary Download Failed] HTTP ${res.status}: ${res.statusText}`);
       return false;

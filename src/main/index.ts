@@ -104,14 +104,19 @@ function updateTrayMenu() {
 }
 
 function createWindow() {
+  const settings = getSettings();
+  const isFirstRun = !settings.onboardingCompleted;
+  const initialWidth = isFirstRun ? 600 : 100;
+  const initialHeight = isFirstRun ? 640 : 100;
+
   window = new BrowserWindow({
-    width: 100,
-    height: 100,
+    width: initialWidth,
+    height: initialHeight,
     show: false,
     frame: false,
     transparent: true,
     hasShadow: true,
-    resizable: false,
+    resizable: true,
     alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -236,7 +241,7 @@ function getSocket(): Socket {
     });
 
     socket.on('error', (data) => {
-      window?.webContents.send('error', data);
+      console.error('[Orchestrator Error]:', data?.message ?? data);
     });
 
     socket.on('connect_error', (err) => {
@@ -259,9 +264,14 @@ ipcMain.on('hide-window', () => {
 
 ipcMain.on('resize-to-orb', () => {
   if (window) {
-    window.setResizable(true);
     window.setSize(100, 100, true);
-    window.setResizable(false);
+    positionTopLeft();
+  }
+});
+
+ipcMain.on('resize-to-onboarding', () => {
+  if (window) {
+    window.setSize(600, 640, true);
     positionTopLeft();
   }
 });
@@ -297,9 +307,12 @@ ipcMain.on('stop-speech', () => {
 });
 
 import { getOllamaStatus, pullLocalModel } from '../providers/ollama-manager';
-import { getFullSetupStatus, runFullSetupSequence } from '../providers/setup-manager';
+import { getFullSetupStatus, runFullSetupSequence, clearLastError, getSetupLogs, getLastError } from '../providers/setup-manager';
 import { setSelectedModelName, downloadWhisperModel } from '../providers/whisper-manager';
 import { setSelectedVoiceName, downloadPiperVoice } from '../providers/piper-manager';
+import { getDatabaseStatus } from '../db';
+import { checkSystemRequirements } from '../shared/sys-check';
+import { getSettings, saveSettings } from '../shared/settings-store';
 
 ipcMain.handle('autostart:get', () => {
   return isAutostartEnabled();
@@ -321,8 +334,47 @@ ipcMain.handle('setup:status', async () => {
   return await getFullSetupStatus();
 });
 
+ipcMain.handle('setup:logs', () => {
+  return getSetupLogs();
+});
+
+ipcMain.handle('settings:get', () => {
+  return getSettings();
+});
+
+ipcMain.handle('settings:save', (_event, settings: any) => {
+  return saveSettings(settings);
+});
+
+ipcMain.handle('db:status', () => {
+  return getDatabaseStatus();
+});
+
+ipcMain.handle('sys:status', () => {
+  return checkSystemRequirements();
+});
+
+import { logErrorToFile } from '../shared/error-logger';
+
 ipcMain.handle('setup:run', async () => {
-  return await runFullSetupSequence();
+  const success = await runFullSetupSequence((progress, text) => {
+    window?.webContents.send('setup:progress', { progress, text });
+  });
+  if (!success) {
+    logErrorToFile(getLastError() || 'Setup sequence failed to complete.', 'SetupRun');
+  }
+  return success;
+});
+
+ipcMain.handle('setup:retry', async () => {
+  clearLastError();
+  const success = await runFullSetupSequence((progress, text) => {
+    window?.webContents.send('setup:progress', { progress, text });
+  });
+  if (!success) {
+    logErrorToFile(getLastError() || 'Setup sequence failed to complete.', 'SetupRetry');
+  }
+  return success;
 });
 
 ipcMain.handle('stt:set-model', async (_event, modelName: string) => {
@@ -334,6 +386,7 @@ ipcMain.handle('tts:set-voice', async (_event, voiceName: string) => {
   setSelectedVoiceName(voiceName);
   return await downloadPiperVoice(voiceName);
 });
+
 
 
 

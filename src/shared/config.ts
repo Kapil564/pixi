@@ -68,3 +68,67 @@ export const config = {
   },
 };
 
+/**
+ * Dynamically applies user settings (API keys and cloud/offline mode) to runtime config.
+ */
+export function applyUserSettingsToConfig(settings: {
+  mode?: 'offline' | 'cloud';
+  apiKeys?: {
+    openai?: string;
+    gemini?: string;
+    groq?: string;
+    fishaudio?: string;
+    elevenlabs?: string;
+  };
+}): void {
+  if (!settings) return;
+
+  const keys = settings.apiKeys || {};
+
+  if (keys.openai) {
+    config.llm.openAiKey = keys.openai;
+    config.stt.openAiKey = keys.openai;
+  }
+  if (keys.gemini) {
+    config.llm.geminiKey = keys.gemini;
+  }
+  if (keys.groq) {
+    config.llm.groqKey = keys.groq;
+    config.stt.groqKey = keys.groq;
+  }
+  if (keys.fishaudio) {
+    config.tts.fishAudioKey = keys.fishaudio;
+  }
+  if (keys.elevenlabs) {
+    config.tts.elevenLabsKey = keys.elevenlabs;
+    config.stt.elevenLabsKey = keys.elevenlabs;
+  }
+
+  if (settings.mode === 'cloud') {
+    if (config.llm.openAiKey) {
+      config.llm.provider = 'openai';
+    } else if (config.llm.geminiKey) {
+      config.llm.provider = 'gemini';
+    } else if (config.llm.groqKey) {
+      config.llm.provider = 'groq';
+    }
+
+    if (config.stt.openAiKey) {
+      config.stt.provider = 'openai';
+    } else if (config.stt.groqKey) {
+      config.stt.provider = 'groq';
+    }
+
+    if (config.tts.fishAudioKey) {
+      config.tts.provider = 'fishaudio';
+    } else if (config.tts.elevenLabsKey) {
+      config.tts.provider = 'elevenlabs';
+    }
+  } else if (settings.mode === 'offline') {
+    config.llm.provider = 'ollama';
+    config.stt.provider = 'whisper';
+    config.tts.provider = 'piper';
+  }
+
+  console.log(`[Config Engine] Applied runtime user settings (mode=${settings.mode || 'default'}, llm=${config.llm.provider}, stt=${config.stt.provider}, tts=${config.tts.provider})`);
+}

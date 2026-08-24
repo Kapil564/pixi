@@ -129,16 +129,18 @@ Return the cumulative updated session summary:`;
     if (newSummary && newSummary.trim().length > 0) {
       updateSessionSummary(sessionId, newSummary.trim());
       console.log(`[Rolling Summary] Updated Session #${sessionId} summary.`);
+
+      // Step 3: Delete pruned raw rows from SQLite messages table ONLY after summary update succeeds
+      const prunedIds = olderMessages.map((m) => m.id);
+      deleteMessagesByIds(prunedIds);
+      console.log(`[Rolling Summary] Deleted ${prunedIds.length} pruned row(s) from SQLite messages table.`);
+      return true;
+    } else {
+      console.warn(`[Rolling Summary Warning] LLM returned empty summary for session #${sessionId}. Retaining raw message rows.`);
+      return false;
     }
-
-    // Step 3: Delete pruned raw rows from SQLite messages table
-    const prunedIds = olderMessages.map((m) => m.id);
-    deleteMessagesByIds(prunedIds);
-    console.log(`[Rolling Summary] Deleted ${prunedIds.length} pruned row(s) from SQLite messages table.`);
-
-    return true;
   } catch (err) {
     console.error(`[Rolling Summary Error] Failed summarizing session #${sessionId}:`, err);
-    return false;
+    throw err instanceof Error ? err : new Error(`Failed to summarize session #${sessionId}: ${String(err)}`);
   }
 }

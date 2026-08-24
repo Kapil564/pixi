@@ -55,10 +55,22 @@ Return ONLY a JSON object matching:
  * Parses JSON response from LLM string.
  */
 function safeJsonParse<T>(raw: string): T | null {
+  if (!raw || !raw.trim()) return null;
+  const cleaned = raw.replace(/```json|```/g, '').trim();
+
   try {
-    const cleaned = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned) as T;
   } catch {
+    // Try extracting JSON array [...] or object {...} using regex
+    const jsonMatch = cleaned.match(/\[[\s\S]*\]/) || cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]) as T;
+      } catch (err) {
+        console.warn('[Fact Extractor JSON Warning] Substring JSON parse failed:', err);
+      }
+    }
+    console.warn('[Fact Extractor JSON Warning] Unable to parse LLM response as JSON:', raw);
     return null;
   }
 }

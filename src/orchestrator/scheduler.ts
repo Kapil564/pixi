@@ -4,6 +4,7 @@ import { getDueReminders, markReminderNotified } from '../db/actions';
 import type { TTSProvider } from '../providers/tts';
 
 let isChecking = false;
+let pollingIntervalId: NodeJS.Timeout | null = null;
 
 /**
  * Checks for due, unnotified reminders in SQLite, sends native Windows notifications,
@@ -28,11 +29,10 @@ export async function checkAndFireDueReminders(tts: TTSProvider): Promise<void> 
 
       try {
         await tts.speak(message);
+        await markReminderNotified(db, reminder.id);
       } catch (err) {
-        console.error('[Scheduler TTS Error]:', err);
+        console.error('[Scheduler TTS Error] Spoken reminder failed, leaving reminder pending for retry:', err);
       }
-
-      await markReminderNotified(db, reminder.id);
     }
   } catch (err) {
     console.error('[Scheduler Error]:', err);
@@ -43,15 +43,32 @@ export async function checkAndFireDueReminders(tts: TTSProvider): Promise<void> 
 
 /**
  * Starts background reminder polling on a 30-second interval independent of UI window state.
+ * Includes a multiple-start guard to prevent duplicate interval accumulations.
  */
 export function startReminderPolling(tts: TTSProvider): void {
+  if (pollingIntervalId) {
+    console.log('[Scheduler] Background reminder polling loop is already active.');
+    return;
+  }
+
   console.log('[Scheduler] Starting background reminder polling loop (30s interval)...');
 
   // Run immediate check on startup
   checkAndFireDueReminders(tts);
 
   // Poll every 30 seconds
-  setInterval(() => {
+  pollingIntervalId = setInterval(() => {
     checkAndFireDueReminders(tts);
   }, 30 * 1000);
+}
+
+/**
+ * Stops active background reminder polling loop and releases timer resources.
+ */
+export function stopReminderPolling(): void {
+  if (pollingIntervalId) {
+    clearInterval(pollingIntervalId);
+    pollingIntervalId = null;
+    console.log('[Scheduler] Stopped background reminder polling loop.');
+  }
 }

@@ -16,14 +16,41 @@ import { extractAndStoreFacts } from '../memory/fact-extractor';
 import { checkAndRunRollingSummary, recordMessageActivity } from '../memory/rolling-summary';
 import { getActiveOrCreateSession, addMessage } from '../db/session-store';
 
+import { getSettings } from '../shared/settings-store';
+import { logErrorToFile } from '../shared/error-logger';
+
 export interface Orchestrator {
   io: Server;
   tts: TTSProvider;
 }
 
 export async function createOrchestrator(): Promise<Orchestrator> {
+  // Sync runtime config with settings.json on startup
+  getSettings();
+
   const httpServer = createServer();
-  const io = new Server(httpServer, { cors: { origin: '*' } });
+  const io = new Server(httpServer, {
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('file://')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Blocked by CORS'));
+        }
+      },
+      methods: ['GET', 'POST'],
+    },
+  });
+
+  // Loopback security middleware: restrict connections to local loopback interface
+  io.use((socket, next) => {
+    const remoteAddr = socket.handshake.address || '';
+    if (!remoteAddr || remoteAddr.includes('127.0.0.1') || remoteAddr.includes('::1') || remoteAddr.includes('localhost')) {
+      return next();
+    }
+    console.warn(`[Socket Security Rejected] Connection attempt from non-loopback address: ${remoteAddr}`);
+    return next(new Error('Unauthorized: Socket.IO connections permitted from loopback 127.0.0.1 only.'));
+  });
 
   // Initialize Markdown memory directory and manifest
   initMemoryStorage();
@@ -120,12 +147,12 @@ export async function createOrchestrator(): Promise<Orchestrator> {
             assistantResponse: assistantText,
             llm,
           }).catch((err) => {
-            console.error('[Fact Extraction Async Error]:', err);
+            logErrorToFile(err, 'FactExtractionAsync');
           });
 
           // 5. Fire background rolling summary check
           checkAndRunRollingSummary(sessionId, llm).catch((err) => {
-            console.error('[Rolling Summary Async Error]:', err);
+            logErrorToFile(err, 'RollingSummaryAsync');
           });
         }
 
@@ -144,7 +171,6 @@ export async function createOrchestrator(): Promise<Orchestrator> {
         if (currentReqId !== activeRequestId) return;
         const message = err instanceof Error ? err.message : String(err);
         console.error('[Pipeline Error]:', message);
-        socket.emit('error', { message });
         await tts.speak('Sorry, something went wrong.');
       }
     });
@@ -218,7 +244,6 @@ export async function createOrchestrator(): Promise<Orchestrator> {
         if (currentReqId !== activeRequestId) return;
         const message = err instanceof Error ? err.message : String(err);
         console.error('[Pipeline Error]:', message);
-        socket.emit('error', { message });
         await tts.speak('Sorry, something went wrong.');
       }
     });
@@ -232,8 +257,8 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     });
   });
 
-  httpServer.listen(config.server.port, () => {
-    console.log(`Saira orchestrator listening on port ${config.server.port}`);
+  httpServer.listen(config.server.port, '127.0.0.1', () => {
+    console.log(`Saira orchestrator listening on 127.0.0.1:${config.server.port}`);
   });
 
   return { io, tts };

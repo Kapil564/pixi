@@ -1,154 +1,179 @@
-# Saira — Windows Voice Assistant
+# Saira
 
-A Siri-like voice assistant for Windows built with Electron, TypeScript, SQLite, and pluggable STT/LLM/TTS providers.
+> A Siri-like native Windows voice assistant with 100% offline privacy mode, local & cloud AI providers, and long-term memory.
 
-## What you need to provide
-
-**Only the API keys you already have.** The app auto-selects providers based on what is filled in, and falls back to free/local options for everything else.
-
-| What the user has | What they type into `.env` | What the app does for them |
-|---|---|---|
-| **Nothing** | leave all API keys blank | Windows SAPI5 TTS, local Ollama LLM, local faster-whisper STT |
-| **OpenAI key** | `OPENAI_API_KEY=*** | Whisper STT + GPT-4o-mini intent + SAPI5 TTS |
-| **Fish Audio key** | `FISH_AUDIO_API_KEY=*** + optional `FISH_AUDIO_REFERENCE_ID` | Premium voice TTS (Fish Audio) |
-| **ElevenLabs key** | `ELEVENLABS_API_KEY=*** + optional `ELEVENLABS_VOICE_ID` | Premium voice TTS (ElevenLabs) |
-| **Gemini key** | `GEMINI_API_KEY=*** | Gemini Flash intent (STT/TTS still auto-fall back) |
-| **Groq key** | `GROQ_API_KEY=*** | Fast Whisper STT + Llama intent + SAPI5 TTS |
-| **Privacy-first** | leave all API keys blank + run local services | faster-whisper + Ollama, fully offline |
-
-No one has to provide every API. Each category is independent.
-
-## Current scope (v0)
-
-- Conversational chat
-- Create reminders
-- Create to-do items
-- Native Windows notifications for reminders
-- Capability gating — clearly refuses tasks it cannot do yet
-
-## Stack
-
-| Part | Technology |
-|---|---|
-| Desktop app | Electron + React + Tailwind CSS |
-| IPC | Socket.io |
-| Speech-to-text | OpenAI Whisper, Groq, or local faster-whisper |
-| Intent parsing | OpenAI, Google Gemini, Groq, or local Ollama |
-| Text-to-speech | Windows SAPI5, Fish Audio, ElevenLabs, or Azure |
-| Storage | SQLite + Drizzle ORM |
-| Scheduling | node-cron + node-notifier |
-| Packaging | electron-builder |
-
-## Setup
-
-```bash
-# 1. Install dependencies
-pnpm install
-
-# 2. Copy environment variables
-cp .env.example .env
-
-# 3. Edit .env with the providers you have (one key per category is enough)
-powershell notepad .env    # or VS Code, Cursor, etc.
-
-# 4. Run database migrations
-pnpm db:generate
-pnpm db:migrate
-
-# 5. Start in development mode
-pnpm dev
-pnpm start
-```
-
-## Download and install
-
-### For users (no code required)
-
-1. Go to the [Releases](https://github.com/Kapil564/saira-assistant/releases) page.
-2. Download the latest asset for your situation:
-
-| File | Use when |
-|---|---|
-| `Saira Setup X.Y.Z.exe` | You have admin rights and want a normal installer |
-| `Saira-X.Y.Z-portable.exe` | You want to run without installing / no admin rights |
-3. Run the downloaded `.exe`. Windows may show a SmartScreen warning — click **More info → Run anyway**.
-4. On first launch, copy `.env.example` to `.env` inside `%APPDATA%\Saira` and fill in only the API keys you have.
-
-> **No API keys?** Leave them blank. Saira will use free Windows SAPI5 TTS + local Ollama LLM + local faster-whisper STT (if those local services are running).
-
-## Building the installer
-
-```bash
-# 1. Install and rebuild native deps for Electron
-pnpm install
-pnpm rebuild
-
-# 2. Bundle TypeScript and create the installer/portable executables
-pnpm build
-pnpm pack
-```
-
-Output appears in `release/`.
+![Release](https://img.shields.io/github/v/release/Kapil564/saira-assistant?style=flat-square&color=blue)
+![License](https://img.shields.io/github/license/Kapil564/saira-assistant?style=flat-square&color=green)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows)
+![TypeScript](https://img.shields.io/badge/language-TypeScript-blue?style=flat-square&logo=typescript)
 
 ---
 
-## How provider selection works
+## 📖 Description
 
-The app asks: "For this category, what do I actually have access to?"
+Most cloud voice assistants lock you into closed ecosystems, require persistent internet connectivity, and collect sensitive voice and personal telemetry. **Saira** solves this by delivering a privacy-first, highly extensible native Windows desktop voice assistant.
 
-### Speech-to-Text
-1. If `STT_PROVIDER=openai` and `OPENAI_API_KEY` is set → OpenAI Whisper
-2. If `STT_PROVIDER=groq` and `GROQ_API_KEY` is set → Groq Whisper
-3. If **no STT API key is set**, ping `OFFLINE_STT_URL` (default `http://localhost:8000`). If reachable, use the local faster-whisper server.
+Whether you want **100% offline operation** using local models (Ollama, GGML Whisper, Piper ONNX) or ultra-fast cloud inference (OpenAI, Google Gemini, Groq, Fish Audio, ElevenLabs), Saira intelligently routes requests and gracefully falls back to local providers whenever APIs are unreachable or offline.
 
-### Intent parsing (LLM)
-1. If `LLM_PROVIDER=openai/gemini/groq` and its API key is set → that provider
-2. If **no LLM API key is set**, use local Ollama at `OLLAMA_BASE_URL`
-3. If `LLM_PROVIDER=ollama` is explicitly chosen, it verifies Ollama is reachable first
-
-### Text-to-Speech
-1. If `TTS_PROVIDER=fishaudio` (or `FISH_AUDIO_API_KEY` is set) → Fish Audio (`https://api.fish.audio/v1/tts`)
-2. If `TTS_PROVIDER=elevenlabs` and `ELEVENLABS_API_KEY` is set → ElevenLabs
-3. If `TTS_PROVIDER=azure` and `AZURE_SPEECH_KEY` is set → Azure
-4. Otherwise → **Windows SAPI5** (free, offline)
-
-| Category | Options |
-|---|---|
-| STT | OpenAI Whisper API, Groq Whisper, local faster-whisper |
-| LLM | OpenAI GPT-4o-mini, Gemini Flash, Groq Llama, local Ollama |
-| TTS | Windows SAPI5 (free/offline), Fish Audio, ElevenLabs, Azure Neural TTS |
-
-Fallback to SAPI5 means the app never breaks.
-
-## Architecture
-
-```
-Electron tray app
-  ↕ Socket.io
-Orchestrator service (Node.js)
-  ↕ HTTP/API calls
-Pluggable providers: STT, LLM, TTS
-  ↕
-Action executor + SQLite store
-```
+### Key Capabilities
+- 🔒 **100% Offline Privacy Mode**: Runs completely on your PC with zero data leaving your machine.
+- 🎙️ **Hands-Free Wake Word & VAD**: Trigger Saira anytime by saying `"Hey Saira"` or using global hotkey `Ctrl+Shift+Space`.
+- 🧠 **Markdown Long-Term Memory**: Automatically extracts, updates, and indexes user preferences, routines, and identity into `%APPDATA%\Saira\memory\`.
+- ⚡ **Pluggable Provider Matrix**: Seamlessly switch between local Ollama / Whisper / Piper models and cloud API keys.
+- 🪟 **Windows Native Integration**: Native desktop notifications, taskbar tray controls, and widget bar overlay modes.
+- ⏰ **Automated Task Scheduling**: Create recurring reminders and to-do items powered by local SQLite storage.
 
 ---
 
-## Privacy, Security & Local Data Storage Isolation
+## 💻 Tech Stack
 
-Saira is built as a **distributable, privacy-first desktop voice assistant**.
+| Component | Technologies & Tools |
+|---|---|
+| **Core Architecture** | Electron (v34+), Node.js (v20+), TypeScript (v5.7+), Socket.io |
+| **User Interface** | React (v18), Tailwind CSS, Vite, tsup, Catppuccin Theme System |
+| **Speech-to-Text (STT)** | OpenAI Whisper API, Groq Whisper, Local GGML `whisper-cli.exe` |
+| **LLM & Intent Parsing** | OpenAI GPT-4o-mini, Google Gemini 1.5 Flash, Groq Llama 3, Local Ollama (`llama3.2:3b`) |
+| **Text-to-Speech (TTS)** | Local Piper ONNX TTS, Windows SAPI5, Fish Audio, ElevenLabs, Azure Speech |
+| **Storage & Database** | SQLite, Drizzle ORM, Per-User Gzip Log Archives |
+| **System & Native OS** | `node-notifier`, `node-cron`, Windows PowerShell Native Audio Pipeline |
 
-### 1. Per-User Local Storage Isolation
-- **100% Local Storage**: All reminders, to-dos, session transcripts, rolling summaries, and long-term memory files stay **strictly on your local machine**.
-- **Per-User AppData Location**: All database and memory files are dynamically resolved to your OS per-user application data directory (`%APPDATA%\Saira\` on Windows or Electron `userData`). No data is written to shared or relative project paths, guaranteeing total per-install isolation.
-  - **SQLite Database**: `%APPDATA%\Saira\assistant.db`
-  - **Long-Term Memory**: `%APPDATA%\Saira\memory\` (`profile.md`, `preferences.md`, `routines.md`, `projects/`, `people/`)
-  - **Session Gzip Archives**: `%APPDATA%\Saira\archive\sessions\*.jsonl.gz`
-- **Zero Shared Backend**: Saira has no central server, no user accounts, no telemetry content tracking, and no remote database sync.
-- **Data Portability**: All user data is self-contained inside `%APPDATA%\Saira\`. Backing up or migrating your Saira instance is as simple as copying this folder to another machine.
+---
 
-### 2. Explicit LLM Transmission Boundary
-- **Local Storage Boundary**: SQLite tables and Markdown memory files never leave your disk.
-- **Per-Turn Request Boundary**: When you speak or type a prompt, that turn's text and retrieved memory context are sent **per-request** to your configured LLM provider (OpenAI, Gemini, Groq, Cloudflare) for processing that single query only.
-- **100% Offline Capability**: If you configure local models (Ollama for LLM, local faster-whisper for STT, Windows SAPI5 for TTS), **zero data ever leaves your local computer**.
+## 🛠️ Getting Started
 
+### Prerequisites
+
+Make sure your machine meets the following software & hardware requirements:
+
+- **Operating System**: Windows 10 or Windows 11 (64-bit)
+- **Node.js**: `v20.0.0` or higher ([Download Node.js](https://nodejs.org/))
+- **Package Manager**: `pnpm` (`v9.x` or higher) — install via `npm i -g pnpm`
+- **Memory (RAM)**: 4 GB RAM minimum (8 GB recommended for local LLM inference)
+- **Disk Space**: ~3 GB free disk space (for local Whisper STT & Piper TTS model storage)
+- *(Optional)* **Ollama**: Required only for 100% local offline LLM inference ([Install Ollama](https://ollama.com))
+
+---
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Kapil564/saira-assistant.git
+   cd saira-assistant
+   ```
+
+2. **Install project dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Set up environment configuration**:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Initialize local database & run migrations**:
+   ```bash
+   pnpm db:generate
+   pnpm db:migrate
+   ```
+
+5. **Launch Saira in development mode**:
+   ```bash
+   pnpm dev
+   ```
+
+---
+
+### Environment Variables
+
+Saira auto-selects active providers based on the keys available in your `.env` or saved in `%APPDATA%\Saira\settings.json`. If no cloud API keys are provided, Saira automatically defaults to **100% Offline Mode**.
+
+Create or update your `.env` file with the keys you possess:
+
+```env
+# ==============================================================================
+# SAIRA ASSISTANT CONFIGURATION
+# ==============================================================================
+
+# Server & IPC Port Configuration
+PORT=3000
+SERVER_URL=http://localhost:3000
+
+# Provider Selection Options:
+# LLM: 'ollama' | 'openai' | 'gemini' | 'groq'
+# STT: 'local-whisper' | 'openai' | 'groq'
+# TTS: 'piper' | 'fishaudio' | 'elevenlabs' | 'azure'
+LLM_PROVIDER=ollama
+STT_PROVIDER=local-whisper
+TTS_PROVIDER=piper
+
+# ------------------------------------------------------------------------------
+# OPTIONAL CLOUD API KEYS (Fill only what you have)
+# ------------------------------------------------------------------------------
+
+# OpenAI API Key (For Whisper STT & GPT-4o-mini LLM)
+OPENAI_API_KEY=
+
+# Google Gemini API Key (For Gemini Flash LLM)
+GEMINI_API_KEY=
+
+# Groq API Key (For ultra-fast Llama & Whisper)
+GROQ_API_KEY=
+
+# Fish Audio TTS API Key & Voice Reference ID
+FISH_AUDIO_API_KEY=
+FISH_AUDIO_REFERENCE_ID=
+
+# ElevenLabs TTS API Key & Voice ID
+ELEVENLABS_API_KEY=
+ELEVENLABS_VOICE_ID=
+
+# Azure Speech Key & Region
+AZURE_SPEECH_KEY=
+AZURE_SPEECH_REGION=
+
+# Local Server URLs
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+#### Fallback Matrix
+
+| Category | Provided API Key | Active Provider | Fallback when API Key is missing |
+|---|---|---|---|
+| **Speech-to-Text** | `OPENAI_API_KEY` or `GROQ_API_KEY` | Cloud Whisper API | Local `whisper-cli.exe` GGML Model |
+| **LLM / Intent** | `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `GROQ_API_KEY` | Cloud LLM Inference | Local Ollama (`llama3.2:3b`) |
+| **Text-to-Speech** | `FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`, or `AZURE_SPEECH_KEY` | Cloud Voice Synthesis | Local Piper ONNX TTS / Windows SAPI5 |
+
+---
+
+### Usage
+
+#### 1. Running the App
+- **Development Mode**:
+  ```bash
+  pnpm dev
+  ```
+- **Build Executables & Distributable Installers**:
+  ```bash
+  pnpm build
+  pnpm pack
+  ```
+  Executable installers and portable binaries will be generated inside `release/`.
+
+#### 2. User Controls & Keybindings
+- **Global Toggle Hotkey**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> anywhere in Windows to bring up Saira.
+- **Hands-Free Voice Activation**: Speak `"Hey Saira"` to activate voice listening.
+- **Interface Switching**: Click the mode toggle button on the floating orb to switch between the **Pixel Blob Orb** and **Windows 11 Widget Bar**.
+
+#### 3. Voice Command Examples
+- *"Hey Saira, set a reminder to call Alex tomorrow at 3 PM."*
+- *"Add buy coffee beans to my to-do list."*
+- *"Show my upcoming reminders."*
+- *"Remember that I prefer dark mode and short answers."*
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.

@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn, execSync } from 'node:child_process';
-import { isLocalServerReachable } from '../shared/http-util';
+import { isLocalServerReachable, executeWithExponentialBackoff } from '../shared/http-util';
 import { config } from '../shared/config';
 
 export interface OllamaStatus {
@@ -224,47 +224,58 @@ export async function pullLocalModel(
   const baseUrl = config.llm.baseUrl || 'http://localhost:11434';
 
   try {
-    const res = await fetch(`${baseUrl}/api/pull`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: DEFAULT_LOCAL_MODEL, stream: true }),
-    });
+    await executeWithExponentialBackoff(
+      async () => {
+        const res = await fetch(`${baseUrl}/api/pull`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: DEFAULT_LOCAL_MODEL, stream: true }),
+        });
 
-    if (!res.ok || !res.body) {
-      const errText = await res.text();
-      console.error(`[Ollama Pull Failed] HTTP ${res.status}: ${errText}`);
-      isDownloading = false;
-      return false;
-    }
+        if (!res.ok || !res.body) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = JSON.parse(line) as { status?: string; completed?: number; total?: number };
-          if (parsed.completed && parsed.total && parsed.total > 0) {
-            const percent = Math.round((parsed.completed / parsed.total) * 100);
-            currentDownloadProgress = percent;
-            if (onProgress) {
-              onProgress(percent, `Downloading ${DEFAULT_LOCAL_MODEL}: ${percent}%`);
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line) as { status?: string; completed?: number; total?: number };
+              if (parsed.completed && parsed.total && parsed.total > 0) {
+                const percent = Math.round((parsed.completed / parsed.total) * 100);
+                currentDownloadProgress = percent;
+                if (onProgress) {
+                  onProgress(percent, `Downloading ${DEFAULT_LOCAL_MODEL}: ${percent}%`);
+                }
+              }
+            } catch {
+              // Skip invalid JSON lines
             }
           }
-        } catch {
-          // Skip invalid JSON lines
+        }
+      },
+      3,
+      1500,
+      (attempt, delayMs, err) => {
+        const warning = `Network glitch pulling ${DEFAULT_LOCAL_MODEL}. Retrying in ${delayMs / 1000}s (Attempt ${attempt}/3)...`;
+        console.warn(`[Ollama Pull Retry] ${warning}`, err);
+        if (onProgress) {
+          onProgress(currentDownloadProgress, warning);
         }
       }
-    }
+    );
 
     currentDownloadProgress = 100;
     isDownloading = false;

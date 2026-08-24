@@ -13,6 +13,7 @@ export interface TTSProvider {
 }
 
 let activePlaybackProcess: ChildProcess | null = null;
+let playbackQueue: Promise<void> = Promise.resolve();
 
 function stopActivePlayback(): void {
   if (activePlaybackProcess && !activePlaybackProcess.killed) {
@@ -22,8 +23,8 @@ function stopActivePlayback(): void {
       if (pid) {
         spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { windowsHide: true });
       }
-    } catch {
-      // ignore cleanup errors
+    } catch (err) {
+      console.debug('[TTS Stop Warning]:', err);
     }
     activePlaybackProcess = null;
   }
@@ -37,60 +38,67 @@ function spawnPowerShellScript(script: string): ChildProcess {
 }
 
 function playAudioBuffer(buffer: Buffer): Promise<void> {
-  stopActivePlayback();
-  const isMp3 = buffer.slice(0, 3).toString('utf8') === 'ID3' || buffer[0] === 0xff;
-  const ext = isMp3 ? 'mp3' : 'wav';
-  const tempFile = path.join(os.tmpdir(), `saira_speech_${Date.now()}.${ext}`);
-  fs.writeFileSync(tempFile, buffer);
+  playbackQueue = playbackQueue.then(async () => {
+    stopActivePlayback();
+    const isMp3 = buffer.slice(0, 3).toString('utf8') === 'ID3' || buffer[0] === 0xff;
+    const ext = isMp3 ? 'mp3' : 'wav';
+    const tempFile = path.join(os.tmpdir(), `saira_speech_${Date.now()}.${ext}`);
+    fs.writeFileSync(tempFile, buffer);
 
-  return new Promise((resolve) => {
-    const script = `
-      try {
-        Add-Type -AssemblyName presentationCore
-        $player = New-Object System.Windows.Media.MediaPlayer
-        $player.Open([Uri]"file:///${tempFile.replace(/\\/g, '/')}")
-        $waited = 0
-        while ($player.NaturalDuration.HasTimeSpan -eq $false -and $waited -lt 40) {
-          Start-Sleep -Milliseconds 100
-          $waited++
-        }
-        $player.Play()
-        if ($player.NaturalDuration.HasTimeSpan) {
-          $ms = [math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds)
-          Start-Sleep -Milliseconds ($ms + 300)
-        } else {
-          Start-Sleep -Seconds 5
-        }
-        $player.Close()
-      } catch {
+    await new Promise<void>((resolve) => {
+      const script = `
         try {
-          $wmp = New-Object -ComObject WMPlayer.OCX
-          $wmp.URL = "${tempFile.replace(/\\/g, '\\\\')}"
-          $wmp.controls.play()
-          while ($wmp.playState -ne 1 -and $wmp.playState -ne 8) { Start-Sleep -Milliseconds 200 }
+          Add-Type -AssemblyName presentationCore
+          $player = New-Object System.Windows.Media.MediaPlayer
+          $player.Open([Uri]"file:///${tempFile.replace(/\\/g, '/')}")
+          $waited = 0
+          while ($player.NaturalDuration.HasTimeSpan -eq $false -and $waited -lt 40) {
+            Start-Sleep -Milliseconds 100
+            $waited++
+          }
+          $player.Play()
+          if ($player.NaturalDuration.HasTimeSpan) {
+            $ms = [math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds)
+            Start-Sleep -Milliseconds ($ms + 300)
+          } else {
+            Start-Sleep -Seconds 5
+          }
+          $player.Close()
         } catch {
-          $sp = New-Object System.Media.SoundPlayer("${tempFile.replace(/\\/g, '\\\\')}")
-          $sp.PlaySync()
+          try {
+            $wmp = New-Object -ComObject WMPlayer.OCX
+            $wmp.URL = "${tempFile.replace(/\\/g, '\\\\')}"
+            $wmp.controls.play()
+            while ($wmp.playState -ne 1 -and $wmp.playState -ne 8) { Start-Sleep -Milliseconds 200 }
+          } catch {
+            $sp = New-Object System.Media.SoundPlayer("${tempFile.replace(/\\/g, '\\\\')}")
+            $sp.PlaySync()
+          }
         }
-      }
-    `;
-    activePlaybackProcess = spawnPowerShellScript(script);
+      `;
+      activePlaybackProcess = spawnPowerShellScript(script);
 
-    activePlaybackProcess.on('close', () => {
-      try {
-        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-      } catch {
-        // ignore cleanup error
-      }
-      activePlaybackProcess = null;
-      resolve();
-    });
+      activePlaybackProcess.on('close', () => {
+        try {
+          if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+        } catch (err) {
+          console.debug('[TTS File Cleanup Warning]:', err);
+        }
+        activePlaybackProcess = null;
+        resolve();
+      });
 
-    activePlaybackProcess.on('error', () => {
-      activePlaybackProcess = null;
-      resolve();
+      activePlaybackProcess.on('error', (err) => {
+        console.warn('[TTS Playback Process Error]:', err);
+        activePlaybackProcess = null;
+        resolve();
+      });
     });
+  }).catch((err) => {
+    console.warn('[TTS Playback Queue Warning]:', err);
   });
+
+  return playbackQueue;
 }
 
 export class PiperLocalTTS implements TTSProvider {
@@ -124,7 +132,12 @@ export class PiperLocalTTS implements TTSProvider {
     return new Promise((resolve, reject) => {
       try {
         const outputWav = path.join(os.tmpdir(), `saira_piper_${Date.now()}.wav`);
-        const args = ['-m', voicePath, '-f', outputWav, '-c'];
+        const configJsonPath = `${voicePath}.json`;
+        const args = ['-m', voicePath, '-f', outputWav];
+        if (fs.existsSync(configJsonPath)) {
+          args.push('-c', configJsonPath);
+        }
+
         console.log(`[Piper Local TTS] Running: ${piperBinary} ${args.join(' ')}`);
 
         this.child = spawn(piperBinary, args, { windowsHide: true });
@@ -139,23 +152,23 @@ export class PiperLocalTTS implements TTSProvider {
 
         this.child.on('close', async (code) => {
           this.child = null;
-          if (code !== 0 || !fs.existsSync(outputWav)) {
+          if (fs.existsSync(outputWav) && fs.statSync(outputWav).size > 100) {
+            try {
+              const buffer = fs.readFileSync(outputWav);
+              cleanupPiperFiles(outputWav);
+              await playAudioBuffer(buffer);
+              resolve();
+            } catch (err) {
+              cleanupPiperFiles(outputWav);
+              reject(err);
+            }
+          } else {
             cleanupPiperFiles(outputWav);
-            reject(new Error(`Piper exited ${code}: ${stderr || 'no stderr'}`));
-            return;
-          }
-          try {
-            const buffer = fs.readFileSync(outputWav);
-            cleanupPiperFiles(outputWav);
-            await playAudioBuffer(buffer);
-            resolve();
-          } catch (err) {
-            cleanupPiperFiles(outputWav);
-            reject(err);
+            reject(new Error(`Piper failed (exit code ${code}): ${stderr || 'No output WAV generated.'}`));
           }
         });
 
-        // Piper reads text from stdin when -c is provided
+        // Piper reads text from stdin
         this.child.stdin?.write(text, 'utf-8');
         this.child.stdin?.end();
       } catch (err) {
@@ -475,12 +488,6 @@ export function createPrimaryTTSProvider(): TTSProvider | null {
       return null;
   }
 }
-
-/**
- * Creates the configured cloud TTS provider, falling back to the local
- * platform TTS provider when no cloud key is available. Use this if you need a
- * single TTSProvider directly rather than the TTSRouter.
- */
 
 function findPiperExecutable(): string | undefined {
   if (process.env.PIPER_BINARY && fs.existsSync(process.env.PIPER_BINARY)) {

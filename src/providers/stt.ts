@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { config } from '../shared/config';
 import { isLocalServerReachable } from '../shared/http-util';
 import type { TranscriptionResult } from '../shared/types';
-import { getSelectedModelName, isModelDownloaded, getModelPath, downloadWhisperModel, downloadWhisperBinary } from './whisper-manager';
+import { getSelectedModelName, isModelDownloaded, getModelPath, downloadWhisperModel, downloadWhisperBinary, findExeRecursive } from './whisper-manager';
 import { getAppPaths } from '../shared/paths';
 
 export interface STTProvider {
@@ -190,19 +190,9 @@ function findWhisperExecutable(): string | undefined {
 
   try {
     const binDir = path.join(getAppPaths().userDataDir, 'bin');
-    const appBinCandidates = [
-      path.join(binDir, 'whisper-cli.exe'),
-      path.join(binDir, 'main.exe'),
-      path.join(binDir, 'whisper.exe'),
-      path.join(binDir, 'whisper-cli'),
-      path.join(binDir, 'main'),
-      path.join(binDir, 'whisper'),
-      path.join(binDir, 'whisper-bin-x64', 'whisper-cli.exe'),
-      path.join(binDir, 'whisper-bin-x64', 'main.exe'),
-      path.join(binDir, 'whisper.cpp', 'whisper-cli.exe'),
-    ];
-    for (const candidate of appBinCandidates) {
-      if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(binDir)) {
+      const found = findExeRecursive(binDir);
+      if (found) return found;
     }
   } catch {
     // ignore
@@ -241,19 +231,23 @@ function writeTempWav(buffer: Buffer): string {
 function transcribeWithWhisperCli(audioBuffer: Buffer, cliBinary: string, modelPath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const tmpWav = writeTempWav(audioBuffer);
-    const outputTxt = `${tmpWav}.txt`;
+    const outputPrefix = path.join(os.tmpdir(), `saira_whisper_${Date.now()}`);
+    const outputTxt = `${outputPrefix}.txt`;
     const args = [
       '-m', modelPath,
       '-f', tmpWav,
       '-otxt',
-      '-of', tmpWav,
+      '-of', outputPrefix,
       '-l', 'en',
+      '-nt',
     ];
 
-    console.log(`[Local Whisper STT] Running: ${cliBinary} ${args.join(' ')}`);
+    console.log(`[Local Whisper STT] Running CLI: ${cliBinary} ${args.join(' ')}`);
     const proc = spawn(cliBinary, args, { windowsHide: true });
 
+    let stdout = '';
     let stderr = '';
+    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
     proc.stderr?.on('data', (data) => { stderr += data.toString(); });
 
     proc.on('error', (err) => {
@@ -267,11 +261,30 @@ function transcribeWithWhisperCli(audioBuffer: Buffer, cliBinary: string, modelP
         if (fs.existsSync(outputTxt)) {
           text = fs.readFileSync(outputTxt, 'utf-8').replace(/\[.*?\]/g, '').trim();
           fs.unlinkSync(outputTxt);
+        } else if (stdout.trim()) {
+          text = stdout.replace(/\[.*?\]/g, '').trim();
         }
+
+        // Filter out CLI deprecation warnings (e.g. from main.exe)
+        text = text
+          .split('\n')
+          .filter((line) => {
+            const l = line.trim();
+            return (
+              !l.startsWith('WARNING:') &&
+              !l.includes('deprecated') &&
+              !l.includes('ggerganov/whisper.cpp') &&
+              !l.startsWith('Please use')
+            );
+          })
+          .join(' ')
+          .trim();
+
         cleanupFiles(tmpWav);
-        if (code !== 0) {
+        if (code !== 0 && !text) {
           reject(new Error(`whisper.cpp exited ${code}: ${stderr || 'no stderr'}`));
         } else {
+          console.log(`[Local Whisper STT] Transcribed text: "${text}"`);
           resolve(text);
         }
       } catch (err) {

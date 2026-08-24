@@ -244,8 +244,8 @@ export function refreshManifest(): MemoryManifestItem[] {
   return items;
 }
 
-export function getManifest(): MemoryManifestItem[] {
-  if (manifestCache.length === 0) {
+export function getManifest(forceRefresh = false): MemoryManifestItem[] {
+  if (manifestCache.length === 0 || forceRefresh) {
     refreshManifest();
   }
   return manifestCache;
@@ -270,6 +270,7 @@ export function getRelevantMemories(userMessage: string): Array<{ relPath: strin
   const userKeywords = extractKeywords(userMessage);
   if (userKeywords.size === 0) return [];
 
+  // Retrieve cached manifest for memory context indexing (manifest is auto-refreshed on saves)
   const manifest = getManifest();
   const results: Array<{ relPath: string; content: string }> = [];
 
@@ -314,10 +315,17 @@ export async function saveFactToMemory(params: {
     const memoryDir = getMemoryDir();
 
     // Standardize path relative to memoryDir
-    let relPath = params.targetFile.replace(/^memory[\/\\]/, '');
+    let relPath = params.targetFile.replace(/^memory[\/\\]/, '').replace(/^(\.\.[\/\\])+/, '');
     if (!relPath.endsWith('.md')) relPath += '.md';
 
-    const fullPath = path.join(memoryDir, relPath);
+    const resolvedMemoryDir = path.resolve(memoryDir);
+    const fullPath = path.resolve(memoryDir, relPath);
+
+    if (!fullPath.startsWith(resolvedMemoryDir + path.sep) && fullPath !== resolvedMemoryDir) {
+      console.error(`[Memory Security Error] Rejected path traversal attempt: "${params.targetFile}" resolves outside memory directory.`);
+      return;
+    }
+
     const parentDir = path.dirname(fullPath);
     if (!fs.existsSync(parentDir)) {
       fs.mkdirSync(parentDir, { recursive: true });

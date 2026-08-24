@@ -78,6 +78,16 @@ function getWorkletUrl() {
   return workletBlobUrl;
 }
 
+function cleanupWorkletUrl() {
+  if (workletBlobUrl) {
+    URL.revokeObjectURL(workletBlobUrl);
+    workletBlobUrl = null;
+  }
+}
+
+import { SetupBanner } from './components/SetupBanner';
+import { OnboardingWizard } from './components/OnboardingWizard';
+
 function App() {
   const [messages, setMessages] = useState<{ from: 'user' | 'saira'; text: string }[]>([]);
   const [listening, setListening] = useState(false);
@@ -86,6 +96,16 @@ function App() {
   const [inputText, setInputText] = useState('');
   const [viewMode, setViewMode] = useState<'orb' | 'widget'>('orb');
   const [orbPhase, setOrbPhase] = useState<OrbPhase>('idle');
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [setupState, setSetupState] = useState<{
+    isComplete: boolean;
+    progress: number;
+    stepText: string;
+  }>({
+    isComplete: true,
+    progress: 100,
+    stepText: '',
+  });
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -106,6 +126,51 @@ function App() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    const assistant = (window as any).assistant;
+    if (!assistant) return;
+
+    Promise.all([
+      assistant.getSettings ? assistant.getSettings() : Promise.resolve(null),
+      assistant.getSetupStatus ? assistant.getSetupStatus() : Promise.resolve(null),
+    ]).then(([settings, st]: [any, any]) => {
+      if (st) {
+        setSetupState({
+          isComplete: st.isComplete,
+          progress: st.overallProgress,
+          stepText: st.stepText,
+        });
+      }
+
+      const isFullyInstalled = Boolean(st?.isComplete);
+      const isOnboardingDone = Boolean(settings?.onboardingCompleted);
+
+      if (isOnboardingDone || isFullyInstalled) {
+        setShowOnboarding(false);
+        if (assistant.resizeToOrb) assistant.resizeToOrb();
+      } else {
+        setShowOnboarding(true);
+        if (assistant.resizeToOnboarding) assistant.resizeToOnboarding();
+      }
+    }).catch(() => {});
+
+    assistant.onSetupProgress?.((data: { progress: number; text: string }) => {
+      const isDone = data.progress >= 100;
+      setSetupState({
+        isComplete: isDone,
+        progress: data.progress,
+        stepText: data.text,
+      });
+
+      if (!isDone && data.progress > 0) {
+        setViewMode('widget');
+      } else if (isDone) {
+        setViewMode('orb');
+      }
+    });
+  }, []);
+
 
   useEffect(() => {
     scrollToBottom();
@@ -479,15 +544,10 @@ function App() {
       }
     });
 
-    assistant.onError?.((error: { message: string }) => {
-      addMessage('saira', `Error: ${error.message}`);
-      setStatus('');
-      setOrbPhase('idle');
-    });
-
     return () => {
       window.removeEventListener('focus', handleReactivate);
       document.removeEventListener('visibilitychange', handleReactivate);
+      cleanupWorkletUrl();
     };
   }, [viewMode]);
 
@@ -515,11 +575,35 @@ function App() {
   const lastUserMsg = messages.filter((m) => m.from === 'user').slice(-1)[0]?.text;
 
   return (
-    <WakeOrb
-      phase={orbPhase}
-      size={100}
-      onClick={toggleRecording}
-    />
+    <>
+      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      {viewMode === 'widget' ? (
+        <div className="w-full flex flex-col items-center">
+          <SetupBanner
+            isComplete={setupState.isComplete}
+            progress={setupState.progress}
+            stepText={setupState.stepText}
+          />
+          <Windows11Widget
+            phase={orbPhase}
+            transcription={lastUserMsg}
+            statusText={status}
+            responseMessage={lastSairaMsg}
+            onMicClick={toggleRecording}
+            onSendText={handleSendText}
+            onSwitchMode={toggleViewMode}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center p-2">
+          <WakeOrb
+            phase={orbPhase}
+            size={100}
+            onClick={toggleRecording}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

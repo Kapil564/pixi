@@ -12,63 +12,100 @@ import type { AssistantResponse, IntentResult } from '../shared/types';
 export async function executeIntent(intent: IntentResult): Promise<AssistantResponse> {
   switch (intent.intent) {
     case 'chat.respond': {
-      return { spoken: intent.params.message, display: intent.params.message };
+      const msg = intent.params?.message || '';
+      return { spoken: msg, display: msg };
     }
 
     case 'reminder.create': {
-      const due = new Date(intent.params.due);
-      await createReminder(db, intent.params.text, due);
+      const text = intent.params?.text?.trim();
+      const rawDue = intent.params?.due;
+      if (!text) {
+        const msg = 'Unable to set reminder: Missing reminder text.';
+        return { spoken: msg, display: msg };
+      }
+      if (!rawDue) {
+        const msg = 'Unable to set reminder: Missing due date/time.';
+        return { spoken: msg, display: msg };
+      }
+      const due = new Date(rawDue);
+      if (isNaN(due.getTime())) {
+        const msg = `Unable to set reminder: Invalid date format "${rawDue}".`;
+        return { spoken: msg, display: msg };
+      }
+
+      await createReminder(db, text, due);
+      const displayText = `Reminder set: ${text} at ${due.toLocaleString()}`;
+      const spokenText = `I have set a reminder for ${text} at ${due.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`;
       return {
-        spoken: '',
-        display: `Reminder set: ${intent.params.text} at ${due.toLocaleString()}`,
+        spoken: spokenText,
+        display: displayText,
       };
     }
 
     case 'reminder.list': {
       const reminders = await listPendingReminders(db);
       if (reminders.length === 0) {
-        return { spoken: '', display: 'No upcoming reminders.' };
+        const msg = 'You have no upcoming reminders.';
+        return { spoken: msg, display: msg };
       }
       const text = reminders.map((r) => `- ${r.text} at ${new Date(r.due).toLocaleString()}`).join('\n');
+      const spokenText = `You have ${reminders.length} upcoming ${reminders.length === 1 ? 'reminder' : 'reminders'}: ${reminders.map(r => r.text).join(', ')}.`;
       return {
-        spoken: '',
+        spoken: spokenText,
         display: text,
       };
     }
 
     case 'reminder.complete': {
-      const reminderId = intent.params.id;
-      if (!reminderId) {
-        return { spoken: '', display: 'Missing reminder id.' };
+      const rawId = intent.params?.id;
+      const reminderId = Number(rawId);
+      if (!rawId || isNaN(reminderId) || reminderId <= 0) {
+        const msg = 'Unable to complete reminder: Missing or invalid reminder ID.';
+        return { spoken: msg, display: msg };
       }
       await markReminderNotified(db, reminderId);
-      return { spoken: '', display: 'Reminder marked complete.' };
+      const msg = `Reminder #${reminderId} marked complete.`;
+      return { spoken: msg, display: msg };
     }
 
     case 'todo.create': {
-      await createTodo(db, intent.params.text);
-      return { spoken: '', display: `Added to-do: ${intent.params.text}` };
+      const text = intent.params?.text?.trim();
+      if (!text) {
+        const msg = 'Unable to add to-do: Missing item text.';
+        return { spoken: msg, display: msg };
+      }
+      await createTodo(db, text);
+      const msg = `Added ${text} to your to-do list.`;
+      return { spoken: msg, display: msg };
     }
 
     case 'todo.list': {
       const todos = await listTodos(db);
       if (todos.length === 0) {
-        return { spoken: '', display: 'No to-dos.' };
+        const msg = 'Your to-do list is empty.';
+        return { spoken: msg, display: msg };
       }
       const text = todos.map((t) => `- [${t.completed ? 'x' : ' '}] ${t.text}`).join('\n');
+      const pendingTodos = todos.filter(t => !t.completed);
+      const spokenText = pendingTodos.length === 0 
+        ? 'All your to-dos are completed.' 
+        : `Here are your to-dos: ${pendingTodos.map(t => t.text).join(', ')}.`;
       return {
-        spoken: '',
+        spoken: spokenText,
         display: text,
       };
     }
 
     case 'todo.complete': {
-      const todoId = intent.params.id;
-      if (!todoId) {
-        return { spoken: '', display: 'Missing to-do id.' };
+      const rawId = intent.params?.id;
+      const todoId = Number(rawId);
+      if (!rawId || isNaN(todoId) || todoId <= 0) {
+        const msg = 'Unable to complete to-do: Missing or invalid to-do ID.';
+        return { spoken: msg, display: msg };
       }
       await completeTodo(db, todoId);
-      return { spoken: '', display: 'To-do marked complete.' };
+      const msg = `To-do #${todoId} marked complete.`;
+      return { spoken: msg, display: msg };
     }
 
     case 'unknown':

@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saira — Local-first Siri-like Voice Assistant for Windows</title>
+  <meta name="description" content="Saira is a privacy-first, Siri-like desktop voice assistant for Windows built with Electron, React, TypeScript, and SQLite. 100% offline capable.">
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500..600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0b0a08;
+      --bg-soft: #131210;
+      --bg-card: #16140f;
+      --rule: rgba(255, 255, 255, 0.09);
+      --text: #f3ede2;
+      --text-muted: #8f8878;
+      --gold: #d99a4e;
+      --gold-glow: rgba(217, 154, 78, 0.15);
+      --sage: #6fae8c;
+      --sage-glow: rgba(111, 174, 140, 0.15);
+      --silver: #c7ccd6;
+      --ember: #e2694a;
+      
+      --font-heading: 'Fraunces', Georgia, serif;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Container & Layout */
+    .container {
+      width: 100%;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      padding: 4.5rem 0;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    section:last-of-type {
+      border-bottom: none;
+    }
+
+    /* Typography Utilities */
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .eyebrow::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--gold);
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-heading);
+      font-style: italic;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    h1 {
+      font-size: clamp(2.25rem, 5vw, 3.75rem);
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+      margin-bottom: 1.5rem;
+    }
+
+    p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--rule);
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      color: var(--gold);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 999px;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background-color: var(--gold);
+      color: var(--bg);
+      border-color: var(--gold);
+      box-shadow: 0 4px 20px var(--gold-glow);
+    }
+
+    .btn-primary:hover {
+      background-color: #e5a75c;
+      border-color: #e5a75c;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(217, 154, 78, 0.3);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--text);
+      border-color: var(--rule);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      transform: translateY(-2px);
+      background: var(--gold-glow);
+    }
+
+    /* Navigation */
+    nav {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--rule);
+      background: rgba(11, 10, 8, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      text-decoration: none;
+    }
+
+    .brand-title {
+      font-family: var(--font-heading);
+      font-style: italic;
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .brand-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 4.5rem 0 5rem;
+    }
+
+    .hero-orb-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .orb-canvas-container {
+      position: relative;
+      width: 260px;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      width: 260px;
+      height: 240px;
+    }
+
+    .state-badge {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 3.5px;
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--rule);
+      margin-top: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .state-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .hero-headline {
+      max-width: 800px;
+      margin: 0 auto 1.25rem;
+    }
+
+    .hero-subhead {
+      max-width: 640px;
+      margin: 0 auto 2rem;
+      font-size: 1.15rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .hero-tags {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 0.3rem 0.85rem;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--rule);
+      color: var(--text-muted);
+    }
+
+    .chip-offline {
+      border-color: rgba(111, 174, 140, 0.4);
+      color: var(--sage);
+      background: var(--sage-glow);
+    }
+
+    /* Cards System */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      padding: 2rem;
+      transition: border-color 0.3s ease, transform 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .card-title {
+      font-size: 1.35rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Why Saira Exists */
+    .bullet-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .bullet-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      font-size: 0.98rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .bullet-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .bullet-dot.ember {
+      background-color: var(--ember);
+      box-shadow: 0 0 10px rgba(226, 105, 74, 0.4);
+    }
+
+    .bullet-dot.sage {
+      background-color: var(--sage);
+      box-shadow: 0 0 10px rgba(111, 174, 140, 0.4);
+    }
+
+    /* Dual UI Modes */
+    .mascot-card-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-soft);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--rule);
+    }
+
+    .widget-mockup {
+      background: #1e1e2e; /* Catppuccin Mocha base */
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .mockup-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mockup-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .mockup-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--gold);
+      background: var(--gold-glow);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(217, 154, 78, 0.3);
+    }
+
+    .mockup-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .skeleton-line {
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.medium { width: 70%; }
+    .skeleton-line.accent { 
+      background: linear-gradient(90deg, var(--gold), var(--sage));
+      width: 85%;
+      height: 10px;
+    }
+
+    /* Architecture Section */
+    .arch-pre {
+      background-color: var(--bg-card);
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      padding: 2rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.65;
+      overflow-x: auto;
+      color: var(--text-muted);
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    .arch-pre .sage {
+      color: var(--sage);
+      font-weight: 500;
+    }
+
+    .arch-pre .gold {
+      color: var(--gold);
+      font-weight: 500;
+    }
+
+    .arch-pre .bright {
+      color: var(--text);
+    }
+
+    /* Providers Grid */
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .provider-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      padding: 1.75rem;
+    }
+
+    .provider-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1.25rem;
+      color: var(--text);
+    }
+
+    .chip-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .provider-footnote {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .provider-footnote .indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--sage);
+      box-shadow: 0 0 8px var(--sage);
+    }
+
+    /* Native Windows Fact Blocks */
+    .native-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+
+    .fact-block {
+      border-left: 2px solid rgba(217, 154, 78, 0.4);
+      padding-left: 1.5rem;
+      transition: border-color 0.3s ease;
+    }
+
+    .fact-block:hover {
+      border-left-color: var(--gold);
+    }
+
+    .fact-title {
+      font-size: 1.2rem;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .fact-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+
+    /* Final CTA */
+    .cta-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, #1a1712 100%);
+      border: 1px solid rgba(217, 154, 78, 0.3);
+      border-radius: 24px;
+      padding: 3.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px var(--gold-glow);
+    }
+
+    .cta-card h2 {
+      margin-bottom: 1rem;
+    }
+
+    .cta-card p {
+      max-width: 580px;
+      margin: 0 auto 2rem;
+    }
+
+    /* Footer */
+    footer {
+      padding: 2.5rem 0;
+      text-align: center;
+      border-top: 1px solid var(--rule);
+    }
+
+    .footer-text {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      color: var(--text-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 760px) {
+      section {
+        padding: 3rem 0;
+      }
+      
+      nav .container {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .card-grid, .provider-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .arch-pre {
+        font-size: 0.78rem;
+        padding: 1.25rem;
+      }
+    }
+
+    /* Motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="container">
+      <a href="#" class="brand" aria-label="Saira Homepage">
+        <span class="brand-title">Saira</span>
+        <span class="brand-subtitle">FOR WINDOWS</span>
+      </a>
+      <a href="saira-bot.html" class="btn btn-secondary" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
+        Try the interaction demo
+      </a>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        
+        <div class="hero-orb-wrapper">
+          <div class="orb-canvas-container">
+            <canvas id="heroOrbCanvas" class="orb-canvas" width="260" height="240" aria-label="Live animated pixel art orb mascot representing Saira's status"></canvas>
+          </div>
+          <div id="heroStateBadge" class="state-badge">
+            <span class="state-dot" id="heroStateDot"></span>
+            <span id="heroStateText">IDLE</span>
+          </div>
+        </div>
+
+        <h1 class="hero-headline">Siri, without the cloud strings attached.</h1>
+        <p class="hero-subhead">
+          A modular, privacy-first desktop voice assistant for Windows. Complete control over your speech, LLM, and synthesis engines with 100% local offline fallback.
+        </p>
+
+        <div class="hero-actions">
+          <a href="saira-bot.html" class="btn btn-primary">Try the interaction demo</a>
+          <a href="#architecture" class="btn btn-secondary">See how it's built</a>
+        </div>
+
+        <div class="hero-tags">
+          <span class="chip">Electron</span>
+          <span class="chip">React</span>
+          <span class="chip">TypeScript</span>
+          <span class="chip">SQLite</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Why Saira Exists -->
+    <section>
+      <div class="container">
+        <div class="eyebrow">THE MOTIVATION</div>
+        <h2>Why Saira exists</h2>
+        
+        <div class="card-grid">
+          
+          <!-- Left Card: The Problem -->
+          <div class="card">
+            <h3 class="card-title">The problem</h3>
+            <ul class="bullet-list">
+              <li class="bullet-item">
+                <span class="bullet-dot ember"></span>
+                <span>Existing desktop voice assistants are tightly locked to proprietary cloud ecosystems — telemetry, mandatory accounts, and static cloud endpoints.</span>
+              </li>
+              <li class="bullet-item">
+                <span class="bullet-dot ember"></span>
+                <span>They break completely when cloud APIs are unavailable or when your internet drops.</span>
+              </li>
+              <li class="bullet-item">
+                <span class="bullet-dot ember"></span>
+                <span>Users have zero local control over which speech, intent, or text-to-speech provider is doing the work.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Right Card: What Saira Does Instead -->
+          <div class="card">
+            <h3 class="card-title">What Saira does instead</h3>
+            <ul class="bullet-list">
+              <li class="bullet-item">
+                <span class="bullet-dot sage"></span>
+                <span>Architected around a modular, local-first engine with a central orchestrator.</span>
+              </li>
+              <li class="bullet-item">
+                <span class="bullet-dot sage"></span>
+                <span>Pluggable STT / LLM / TTS providers with automatic fallback for 100% offline operation.</span>
+              </li>
+              <li class="bullet-item">
+                <span class="bullet-dot sage"></span>
+                <span>Long-term memory stored locally in SQLite (<code>%APPDATA%\Saira\assistant.db</code>) and human-editable Markdown memory files.</span>
+              </li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Two Ways to See Her -->
+    <section>
+      <div class="container">
+        <div class="eyebrow">DUAL UI MODES</div>
+        <h2>Two ways to see her</h2>
+        
+        <div class="card-grid">
+          
+          <!-- Card 1: Mascot Orb -->
+          <div class="card">
+            <div class="mascot-card-preview">
+              <canvas id="cardOrbCanvas" class="orb-canvas" width="130" height="120" style="width: 130px; height: 120px;"></canvas>
+            </div>
+            <h3 class="card-title">Pixel-art mascot orb</h3>
+            <p>
+              A lightweight, floating pixel-art orb mascot that sits on your desktop, live-drawn on canvas to reflect state changes—idle, listening, thinking, and speaking—with micro-animations.
+            </p>
+          </div>
+
+          <!-- Card 2: Windows 11 Widget -->
+          <div class="card">
+            <div class="widget-mockup">
+              <div class="mockup-header">
+                <div class="mockup-dots">
+                  <span class="mockup-dot" style="background: #f38ba8;"></span>
+                  <span class="mockup-dot" style="background: #f9e2af;"></span>
+                  <span class="mockup-dot" style="background: #a6e3a1;"></span>
+                </div>
+                <span class="mockup-badge">Mockup Only</span>
+              </div>
+              <div class="mockup-body">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line accent"></div>
+                <div class="skeleton-line medium" style="width: 50%;"></div>
+              </div>
+            </div>
+            <h3 class="card-title">Windows 11 widget</h3>
+            <p>
+              A Catppuccin-themed frameless desktop widget interface for Windows 11, providing continuous voice activity feedback, real-time logs, and instant provider switches.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Under the Hood -->
+    <section id="architecture">
+      <div class="container">
+        <div class="eyebrow">ARCHITECTURE</div>
+        <h2>Under the hood</h2>
+        
+        <pre class="arch-pre">
+<span class="gold">Electron Tray App (Main Process)</span>
+  ├── Global Hotkey (<span class="bright">Ctrl+Shift+Space</span>) & System Tray Menu
+  ├── System Sleep / Wake / Screen Unlock Monitors
+  └── Transparent Frameless Overlay (Widget / Mascot)
+        <span class="bright">↕ Socket.io IPC</span>
+<span class="gold">Node.js Orchestrator & Task Scheduler</span>
+  ├── Pluggable STT  ──> OpenAI Whisper · Groq Whisper · <span class="sage">Local faster-whisper</span>
+  ├── Pluggable LLM  ──> GPT-4o-mini · Gemini Flash · Groq Llama · <span class="sage">Local Ollama</span>
+  ├── Pluggable TTS  ──> Fish Audio · ElevenLabs · Azure · <span class="sage">SAPI5 / Piper</span>
+  └── Local Storage  ──> <span class="sage">SQLite (assistant.db) + Markdown memory</span>
+        </pre>
+      </div>
+    </section>
+
+    <!-- Choose Your Providers -->
+    <section>
+      <div class="container">
+        <div class="eyebrow">PLUGGABLE PIPELINE</div>
+        <h2>Choose your providers</h2>
+        
+        <div class="provider-grid">
+          
+          <!-- Column 1: STT -->
+          <div class="provider-card">
+            <h3>STT (Speech-to-Text)</h3>
+            <div class="chip-cloud">
+              <span class="chip">OpenAI Whisper</span>
+              <span class="chip">Groq Whisper</span>
+              <span class="chip chip-offline">Local faster-whisper</span>
+            </div>
+          </div>
+
+          <!-- Column 2: LLM -->
+          <div class="provider-card">
+            <h3>LLM (Intelligence)</h3>
+            <div class="chip-cloud">
+              <span class="chip">GPT-4o-mini</span>
+              <span class="chip">Gemini Flash</span>
+              <span class="chip">Groq Llama</span>
+              <span class="chip chip-offline">Local Ollama</span>
+            </div>
+          </div>
+
+          <!-- Column 3: TTS -->
+          <div class="provider-card">
+            <h3>TTS (Voice Output)</h3>
+            <div class="chip-cloud">
+              <span class="chip">Fish Audio</span>
+              <span class="chip">ElevenLabs</span>
+              <span class="chip">Azure</span>
+              <span class="chip chip-offline">Windows SAPI5 / Piper</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="provider-footnote">
+          <span class="indicator"></span>
+          <span>Chips styled in sage support 100% offline local execution with zero internet or API requirements.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Native to Windows -->
+    <section>
+      <div class="container">
+        <div class="eyebrow">DEEP OS INTEGRATION</div>
+        <h2>Native to Windows</h2>
+        
+        <div class="native-grid">
+          
+          <div class="fact-block">
+            <h3 class="fact-title">Tray app, global hotkey & autostart</h3>
+            <p class="fact-desc">
+              Runs quietly in the Windows System Tray. Press <code>Ctrl+Shift+Space</code> anywhere across the OS to summon Saira immediately. Configured to auto-start on boot via <code>openAtLogin</code>.
+            </p>
+          </div>
+
+          <div class="fact-block">
+            <h3 class="fact-title">Frameless overlay & OS notifications</h3>
+            <p class="fact-desc">
+              Frameless, transparent, always-on-top window overlay for both the Catppuccin widget and pixel mascot. Native Windows desktop popups powered by <code>node-notifier</code>.
+            </p>
+          </div>
+
+          <div class="fact-block">
+            <h3 class="fact-title">Sleep, wake & unlock reminder checks</h3>
+            <p class="fact-desc">
+              Monitors system sleep, wake, and screen-unlock events in real time to scan <code>%APPDATA%\Saira\assistant.db</code> and surface overdue reminders as soon as you unlock your device.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section>
+      <div class="container">
+        <div class="cta-card">
+          <h2>Try the interaction demo</h2>
+          <p>
+            The native Windows desktop application is currently under active development. Experience the live state machine and speech flow right now in your browser.
+          </p>
+          <a href="saira-bot.html" class="btn btn-primary">Launch Interactive Demo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-text">Saira — Electron · React · TypeScript · SQLite</div>
+    </div>
+  </footer>
+
+  <!-- Canvas Pixel-Art Orb Renderer Factory & Auto-Cycler Script -->
+  <script>
+    /**
+     * Canvas Pixel-Art Orb Renderer
+     * Draws Saira's pixel art mascot dynamically on an HTML5 canvas element.
+     * Grid size: ~26 x 24 logical pixels.
+     */
+    function createOrb(canvas, options = {}) {
+      const ctx = canvas.getContext('2d');
+      const logicalW = 26;
+      const logicalH = 24;
+      
+      let state = options.initialState || 'idle'; // 'idle' | 'listening' | 'speaking'
+      let t = 0;
+      let animationFrameId = null;
+
+      // Color Palettes
+      const PALETTES = {
+        idle: {
+          body: '#e2e5e7',
+          highlight: '#ffffff',
+          blush: '#f2a4b0',
+          outline: '#1e2028',
+          accentDot: '#d99a4e'
+        },
+        listening: {
+          body: '#76d18c',
+          highlight: '#a8f0b8',
+          blush: '#e895a2',
+          outline: '#1e2028',
+          accentDot: '#6fae8c'
+        },
+        speaking: {
+          body: '#f6dfa9',
+          highlight: '#fff5d6',
+          blush: '#f0989e',
+          outline: '#1e2028',
+          accentDot: '#e2694a'
+        }
+      };
+
+      function setState(newState) {
+        if (PALETTES[newState]) {
+          state = newState;
+        }
+      }
+
+      function getState() {
+        return state;
+      }
+
+      function drawPixel(x, y, color) {
+        const cellW = canvas.width / logicalW;
+        const cellH = canvas.height / logicalH;
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.floor(x * cellW), Math.floor(y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+      }
+
+      function renderFrame() {
+        t += 0.05;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const palette = PALETTES[state] || PALETTES.idle;
+
+        // 1. Character Body (Rounded square)
+        // Head fill (X: 5 to 20, Y: 6 to 19)
+        for (let x = 5; x <= 20; x++) {
+          for (let y = 6; y <= 19; y++) {
+            // Cut corners for rounded effect
+            if ((x === 5 || x === 20) && (y === 6 || y === 19)) continue;
+            drawPixel(x, y, palette.body);
+          }
+        }
+
+        // Side Ears (Left ear: X: 3..4, Y: 11..14; Right ear: X: 21..22, Y: 11..14)
+        for (let y = 11; y <= 14; y++) {
+          drawPixel(3, y, palette.body);
+          drawPixel(4, y, palette.body);
+          drawPixel(21, y, palette.body);
+          drawPixel(22, y, palette.body);
+        }
+
+        // 2. Character Outline (#1e2028)
+        // Top edge
+        for (let x = 6; x <= 19; x++) drawPixel(x, 5, palette.outline);
+        // Bottom edge
+        for (let x = 6; x <= 19; x++) drawPixel(x, 20, palette.outline);
+        // Left & Right head vertical edges
+        for (let y = 7; y <= 10; y++) {
+          drawPixel(4, y, palette.outline);
+          drawPixel(21, y, palette.outline);
+        }
+        for (let y = 15; y <= 18; y++) {
+          drawPixel(4, y, palette.outline);
+          drawPixel(21, y, palette.outline);
+        }
+        // Ear outlines
+        drawPixel(3, 10, palette.outline);
+        drawPixel(2, 11, palette.outline);
+        drawPixel(2, 12, palette.outline);
+        drawPixel(2, 13, palette.outline);
+        drawPixel(2, 14, palette.outline);
+        drawPixel(3, 15, palette.outline);
+
+        drawPixel(22, 10, palette.outline);
+        drawPixel(23, 11, palette.outline);
+        drawPixel(23, 12, palette.outline);
+        drawPixel(23, 13, palette.outline);
+        drawPixel(23, 14, palette.outline);
+        drawPixel(22, 15, palette.outline);
+
+        // Corner diagonally cut outlines
+        drawPixel(5, 6, palette.outline);
+        drawPixel(20, 6, palette.outline);
+        drawPixel(5, 19, palette.outline);
+        drawPixel(20, 19, palette.outline);
+
+        // 3. Highlight Patch (Top-left)
+        for (let x = 7; x <= 10; x++) {
+          drawPixel(x, 7, palette.highlight);
+        }
+        drawPixel(7, 8, palette.highlight);
+
+        // 4. Blush Cheeks (Pink rectangles)
+        for (let x = 6; x <= 8; x++) {
+          drawPixel(x, 14, palette.blush);
+          drawPixel(x, 15, palette.blush);
+        }
+        for (let x = 17; x <= 19; x++) {
+          drawPixel(x, 14, palette.blush);
+          drawPixel(x, 15, palette.blush);
+        }
+
+        // 5. State-Specific Details
+        if (state === 'idle') {
+          // Closed Dot-Line Eyes (3x1 line)
+          drawPixel(9, 11, palette.outline);
+          drawPixel(10, 11, palette.outline);
+          drawPixel(11, 11, palette.outline);
+
+          drawPixel(14, 11, palette.outline);
+          drawPixel(15, 11, palette.outline);
+          drawPixel(16, 11, palette.outline);
+
+          // Small "o" mouth (2x2)
+          drawPixel(12, 14, palette.outline);
+          drawPixel(13, 14, palette.outline);
+          drawPixel(12, 15, palette.outline);
+          drawPixel(13, 15, palette.outline);
+
+          // Drifting 'Z' Glyphs (2 purple floating Zs)
+          const zProgress1 = (t * 0.4) % 1;
+          const zProgress2 = (t * 0.4 + 0.5) % 1;
+
+          drawZGlyph(19 + Math.sin(t * 2) * 1.2, 8 - zProgress1 * 9, 1 - zProgress1);
+          drawZGlyph(21 + Math.cos(t * 2) * 1.2, 9 - zProgress2 * 9, 1 - zProgress2);
+        } 
+        else if (state === 'listening') {
+          // Dual Antennas with Blue Tips
+          // Left antenna
+          drawPixel(8, 4, palette.outline);
+          drawPixel(8, 3, palette.outline);
+          drawPixel(7, 2, palette.outline);
+          drawPixel(7, 1, '#5cbbf0'); // Blue tip
+          drawPixel(6, 1, palette.outline);
+          drawPixel(8, 1, palette.outline);
+          drawPixel(7, 0, palette.outline);
+
+          // Right antenna
+          drawPixel(17, 4, palette.outline);
+          drawPixel(17, 3, palette.outline);
+          drawPixel(18, 2, palette.outline);
+          drawPixel(18, 1, '#5cbbf0'); // Blue tip
+          drawPixel(17, 1, palette.outline);
+          drawPixel(19, 1, palette.outline);
+          drawPixel(18, 0, palette.outline);
+
+          // Wide Open Eyes with sine-moving glint
+          const glintOffset = Math.sin(t * 4) > 0 ? 1 : 0;
+          drawOpenEye(9, 10, glintOffset);
+          drawOpenEye(15, 10, glintOffset);
+
+          // Open alert "O" mouth (3x3 hollow)
+          drawPixel(12, 14, palette.outline);
+          drawPixel(13, 14, palette.outline);
+          drawPixel(11, 15, palette.outline);
+          drawPixel(14, 15, palette.outline);
+          drawPixel(12, 16, palette.outline);
+          drawPixel(13, 16, palette.outline);
+        } 
+        else if (state === 'speaking') {
+          // Wide Open Eyes with static glint
+          drawOpenEye(9, 10, 0);
+          drawOpenEye(15, 10, 0);
+
+          // Animating mouth cycling between flat line and taller rectangle
+          const talkCycle = Math.sin(t * 12) > 0;
+          if (talkCycle) {
+            // Taller open mouth
+            for (let x = 11; x <= 14; x++) {
+              for (let y = 14; y <= 16; y++) {
+                drawPixel(x, y, palette.outline);
+              }
+            }
+            drawPixel(12, 15, '#e2694a'); // Tongue fill
+            drawPixel(13, 15, '#e2694a');
+          } else {
+            // Flat closed line mouth
+            for (let x = 11; x <= 14; x++) {
+              drawPixel(x, 14, palette.outline);
+            }
+          }
+        }
+
+        animationFrameId = requestAnimationFrame(renderFrame);
+      }
+
+      function drawOpenEye(startX, startY, glintXOffset) {
+        // 3x3 eye box
+        for (let x = startX; x < startX + 3; x++) {
+          for (let y = startY; y < startY + 3; y++) {
+            drawPixel(x, y, '#1e2028');
+          }
+        }
+        // White glint pixel
+        drawPixel(startX + glintXOffset, startY, '#ffffff');
+      }
+
+      function drawZGlyph(gx, gy, alpha) {
+        if (alpha <= 0) return;
+        const color = `rgba(180, 140, 235, ${alpha.toFixed(2)})`;
+        // Draw small 3x3 Z shape
+        drawPixel(gx, gy, color);
+        drawPixel(gx + 1, gy, color);
+        drawPixel(gx + 2, gy, color);
+        drawPixel(gx + 1, gy + 1, color);
+        drawPixel(gx, gy + 2, color);
+        drawPixel(gx + 1, gy + 2, color);
+        drawPixel(gx + 2, gy + 2, color);
+      }
+
+      function start() {
+        if (!animationFrameId) {
+          renderFrame();
+        }
+      }
+
+      function stop() {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+      }
+
+      start();
+
+      return {
+        setState,
+        getState,
+        stop,
+        start
+      };
+    }
+
+    // Initialize Orbs
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Hero Auto-cycling Orb Instance
+      const heroCanvas = document.getElementById('heroOrbCanvas');
+      const heroStateText = document.getElementById('heroStateText');
+      const heroStateDot = document.getElementById('heroStateDot');
+
+      if (heroCanvas) {
+        const heroOrb = createOrb(heroCanvas, { initialState: 'idle' });
+
+        const states = [
+          { name: 'idle', color: '#d99a4e' },
+          { name: 'listening', color: '#6fae8c' },
+          { name: 'speaking', color: '#e2694a' }
+        ];
+        let stateIdx = 0;
+
+        setInterval(() => {
+          stateIdx = (stateIdx + 1) % states.length;
+          const currentState = states[stateIdx];
+          heroOrb.setState(currentState.name);
+
+          if (heroStateText) {
+            heroStateText.textContent = currentState.name.toUpperCase();
+          }
+          if (heroStateDot) {
+            heroStateDot.style.background = currentState.color;
+            heroStateDot.style.boxShadow = `0 0 8px ${currentState.color}`;
+          }
+        }, 2800);
+      }
+
+      // 2. Card Preview Orb Instance
+      const cardCanvas = document.getElementById('cardOrbCanvas');
+      if (cardCanvas) {
+        const cardOrb = createOrb(cardCanvas, { initialState: 'listening' });
+      }
+    });
+  </script>
+</body>
+</html>

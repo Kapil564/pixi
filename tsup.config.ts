@@ -11,7 +11,7 @@ export default defineConfig([
     platform: 'node',
     target: 'node20',
     bundle: true,
-    clean: true,
+    clean: false,
     sourcemap: true,
     external: ['electron', 'better-sqlite3'],
     noExternal: [

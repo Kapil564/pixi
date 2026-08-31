@@ -6,10 +6,15 @@
   "author": "Kapil564",
   "license": "MIT",
   "scripts": {
-    "dev": "tsup --watch --onSuccess \"electronmon .\"",
-    "build": "tsup",
+    "dev:css": "tailwindcss -i ./src/renderer/styles.css -o ./dist/renderer/styles.css --watch",
+    "dev:js": "tsup --watch --onSuccess \"electronmon .\"",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"CSS,JS\" -c \"blue.bold,green.bold\" \"pnpm dev:css\" \"pnpm dev:js\"",
+    "clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true });\"",
+    "build:css": "tailwindcss -i ./src/renderer/styles.css -o ./dist/renderer/styles.css --minify",
+    "build": "pnpm clean && tsup && pnpm build:css",
     "start": "electronmon .",
-    "prepack": "pnpm build",
+    "postinstall": "electron-rebuild",
+    "prepack": "electron-rebuild && pnpm build",
     "pack": "electron-builder",
     "lint": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
@@ -32,7 +37,8 @@
     "better-sqlite3": "^11.0.0",
     "bindings": "^1.5.0",
     "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.31.0",
+    "drizzle-orm": "^0.45.2",
+    "file-uri-to-path": "^2.0.0",
     "fish-audio": "^0.1.0",
     "groq-sdk": "^0.5.0",
     "node-cron": "^3.0.3",
@@ -54,6 +60,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/ws": "^8.5.10",
+    "concurrently": "^10.0.5",
     "drizzle-kit": "^0.22.0",
     "electron": "^31.7.7",
     "electron-builder": "^24.13.0",
@@ -63,5 +70,8 @@
     "tsup": "^8.0.0",
     "tsx": "^4.16.0",
     "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

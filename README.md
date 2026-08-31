@@ -97,15 +97,15 @@ Create or update your `.env` file with the keys you possess:
 # ==============================================================================
 
 # Server & IPC Port Configuration
-PORT=3000
-SERVER_URL=http://localhost:3000
+PORT=16123
+SERVER_URL=http://localhost:16123
 
 # Provider Selection Options:
-# LLM: 'ollama' | 'openai' | 'gemini' | 'groq'
-# STT: 'local-whisper' | 'openai' | 'groq'
-# TTS: 'piper' | 'fishaudio' | 'elevenlabs' | 'azure'
+# LLM: 'ollama' | 'openai' | 'gemini' | 'groq' | 'cloudflare'
+# STT: 'whisper' | 'openai' | 'groq' | 'cloudflare' | 'elevenlabs'
+# TTS: 'piper' | 'fishaudio' | 'elevenlabs' | 'azure' | 'cloudflare'
 LLM_PROVIDER=ollama
-STT_PROVIDER=local-whisper
+STT_PROVIDER=whisper
 TTS_PROVIDER=piper
 
 # ------------------------------------------------------------------------------

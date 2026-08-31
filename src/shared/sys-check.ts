@@ -41,7 +41,7 @@ export function checkSystemRequirements(): SystemRequirementsResult {
   const requiredMinFreeRam = isCloudMode ? 0.5 : 1.0;
 
   const ramOk = freeRamGb >= requiredMinFreeRam;
-  const isX64 = cpuArch === 'x64' || cpuArch === 'arm64';
+  const isX64 = cpuArch === 'x64';
 
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -53,7 +53,7 @@ export function checkSystemRequirements(): SystemRequirementsResult {
   }
 
   if (!isX64) {
-    const msg = `CPU Architecture "${cpuArch}" is not 64-bit (x64/arm64 recommended for local AI binaries).`;
+    const msg = `CPU Architecture "${cpuArch}" is not 64-bit x64 (x64 required for native Whisper & Piper binaries).`;
     warnings.push(msg);
     console.warn(`[System Requirements Warning] ${msg}`);
   }

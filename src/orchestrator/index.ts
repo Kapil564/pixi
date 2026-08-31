@@ -257,8 +257,34 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     });
   });
 
-  httpServer.listen(config.server.port, '127.0.0.1', () => {
-    console.log(`Saira orchestrator listening on 127.0.0.1:${config.server.port}`);
+  await new Promise<void>((resolve, reject) => {
+    let attempts = 0;
+    const maxAttempts = 20;
+    const initialPort = config.server.port;
+
+    const tryListen = (port: number) => {
+      const onError = (err: any) => {
+        if (err.code === 'EADDRINUSE' && attempts < maxAttempts) {
+          attempts++;
+          const nextPort = initialPort + attempts;
+          console.warn(`[Orchestrator Port Warning] Port ${port} is in use. Retrying with fallback port ${nextPort}...`);
+          tryListen(nextPort);
+        } else {
+          console.error(`[Orchestrator Port Error] Failed to bind HTTP server to port ${port}:`, err);
+          reject(err);
+        }
+      };
+
+      httpServer.once('error', onError);
+      httpServer.listen(port, '127.0.0.1', () => {
+        httpServer.removeListener('error', onError);
+        config.server.port = port;
+        console.log(`Saira orchestrator listening on 127.0.0.1:${port}`);
+        resolve();
+      });
+    };
+
+    tryListen(initialPort);
   });
 
   return { io, tts };

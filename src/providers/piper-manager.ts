@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import { spawn } from 'node:child_process';
 import { getAppPaths } from '../shared/paths';
 import { fetchWithRetry, executeWithExponentialBackoff } from '../shared/http-util';
+import { verifyFileIntegrity, KNOWN_CHECKSUMS } from '../shared/checksum';
 
 export interface PiperStatus {
   voiceName: string; // 'en_US-amy-medium' | 'en_US-lessac-medium' | 'en_GB-alan-medium'
@@ -193,6 +194,14 @@ export async function downloadPiperVoice(
           fileStream.end();
         });
 
+        const voiceFileName = `${voiceName}.onnx`;
+        const expectedVoiceHash = KNOWN_CHECKSUMS[voiceFileName];
+        const voiceIntegrity = await verifyFileIntegrity(tempPath, expectedVoiceHash);
+        if (expectedVoiceHash && !voiceIntegrity.valid) {
+          try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+          throw new Error(`Integrity verification failed for ${voiceFileName} (SHA-256 mismatch).`);
+        }
+
         if (fs.existsSync(targetPath)) {
           fs.unlinkSync(targetPath);
         }
@@ -270,6 +279,13 @@ export async function downloadPiperBinary(): Promise<boolean> {
       fileStream.on('finish', resolve);
       fileStream.on('error', reject);
     });
+
+    const expectedZipHash = KNOWN_CHECKSUMS['piper_windows_amd64.zip'];
+    const zipIntegrity = await verifyFileIntegrity(zipPath, expectedZipHash);
+    if (expectedZipHash && !zipIntegrity.valid) {
+      try { if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath); } catch {}
+      throw new Error(`Integrity verification failed for piper_windows_amd64.zip (SHA-256 mismatch).`);
+    }
 
     console.log(`[Piper Binary Download] Extracting zip to ${binDir}...`);
     await new Promise<void>((resolve, reject) => {

@@ -46,8 +46,10 @@ export function getAppPaths(): AppPaths {
 
   // Find Drizzle migrations folder location (dev vs prod bundle)
   // In packaged Electron apps we are inside dist/main/index.js, so migrations live
-  // next to the bundled JS (dist/drizzle) or in the unpacked app resources directory.
+  // at app.asar root (../../drizzle), in dist/drizzle, or in app resources directory.
   const candidates = [
+    path.join(__dirname, '..', '..', 'drizzle'),        // dist/main -> app root / app.asar root
+    path.join(process.resourcesPath || '', 'app.asar', 'drizzle'), // electron-builder app.asar/drizzle
     path.join(__dirname, '..', 'drizzle'),              // dist/main -> dist/drizzle
     path.join(__dirname, 'drizzle'),                    // dist/drizzle
     path.join(process.cwd(), 'drizzle'),                // dev source root

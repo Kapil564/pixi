@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import { spawn } from 'node:child_process';
 import { getAppPaths } from '../shared/paths';
 import { fetchWithRetry, executeWithExponentialBackoff } from '../shared/http-util';
+import { verifyFileIntegrity, KNOWN_CHECKSUMS } from '../shared/checksum';
 
 export interface WhisperStatus {
   modelName: string; // 'small.en' | 'base.en'
@@ -167,6 +168,13 @@ export async function downloadWhisperBinary(): Promise<boolean> {
       fileStream.on('error', reject);
     });
 
+    const expectedZipHash = KNOWN_CHECKSUMS['whisper-bin-x64.zip'];
+    const zipIntegrity = await verifyFileIntegrity(zipPath, expectedZipHash);
+    if (expectedZipHash && !zipIntegrity.valid) {
+      try { if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath); } catch {}
+      throw new Error(`Integrity verification failed for whisper-bin-x64.zip (SHA-256 mismatch).`);
+    }
+
     console.log(`[Whisper Binary Download] Extracting zip to ${binDir}...`);
     await new Promise<void>((resolve, reject) => {
       const cmd = `Expand-Archive -Path "${zipPath.replace(/"/g, '`"')}" -DestinationPath "${binDir.replace(/"/g, '`"')}" -Force`;
@@ -290,6 +298,14 @@ export async function downloadWhisperModel(
           fileStream.on('error', reject);
           fileStream.end();
         });
+
+        const modelFileName = `ggml-${modelName}.bin`;
+        const expectedModelHash = KNOWN_CHECKSUMS[modelFileName];
+        const modelIntegrity = await verifyFileIntegrity(tempPath, expectedModelHash);
+        if (expectedModelHash && !modelIntegrity.valid) {
+          try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+          throw new Error(`Integrity verification failed for ${modelFileName} (SHA-256 mismatch).`);
+        }
 
         // Rename temp file to final .bin file
         if (fs.existsSync(targetPath)) {

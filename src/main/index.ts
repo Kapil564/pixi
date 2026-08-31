@@ -170,12 +170,7 @@ app.whenReady().then(async () => {
   tray.on('click', toggleWindow);
   updateTrayMenu();
 
-  // 2. Default register autostart if not configured
-  if (!isAutostartEnabled()) {
-    setAutostartEnabled(true);
-  }
-
-  // 3. Create Main UI Window
+  // 2. Create Main UI Window
   createWindow();
 
   // If launching normally (without --hidden), show UI window

@@ -8,9 +8,13 @@ files:
   - drizzle
   - package.json
   - assets
+  - index.html
 asar: true
 asarUnpack:
   - "**/*.node"
+  - "**/node_modules/better-sqlite3/**/*"
+  - "**/node_modules/bindings/**/*"
+  - "**/node_modules/file-uri-to-path/**/*"
 npmRebuild: false
 win:
   target:
@@ -21,6 +25,8 @@ win:
       arch:
         - x64
   icon: assets/icon.png
+  publisherName: Kapil564
+  verifyUpdateCodeSignature: false
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

@@ -14,6 +14,20 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     external: ['electron', 'better-sqlite3'],
+    noExternal: [
+      '@google/generative-ai',
+      'dotenv',
+      'drizzle-orm',
+      'fish-audio',
+      'groq-sdk',
+      'node-cron',
+      'node-notifier',
+      'node-record-lpcm16',
+      'openai',
+      'socket.io',
+      'socket.io-client',
+      'zod',
+    ],
   },
   {
     entry: {

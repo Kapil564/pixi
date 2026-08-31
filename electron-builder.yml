@@ -8,6 +8,10 @@ files:
   - drizzle
   - package.json
   - assets
+asar: true
+asarUnpack:
+  - "**/*.node"
+npmRebuild: false
 win:
   target:
     - target: nsis

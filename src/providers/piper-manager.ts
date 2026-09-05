@@ -49,6 +49,7 @@ const VOICE_URLS: Record<string, { onnx: string; json: string }> = {
 
 let currentVoice = process.env.PIPER_LOCAL_VOICE || 'en_US-amy-medium';
 let isDownloading = false;
+let downloadingVoice: string | null = null;
 let currentProgress = 0;
 
 /**
@@ -134,11 +135,16 @@ export async function downloadPiperVoice(
   }
 
   if (isDownloading) {
-    console.log('[Piper Download] Download already in progress.');
-    return true;
+    if (downloadingVoice === voiceName) {
+      console.log('[Piper Download] Same voice download already in progress.');
+      return true;
+    }
+    console.log(`[Piper Download] Different voice "${voiceName}" requested but "${downloadingVoice}" is downloading. Waiting...`);
+    return false;
   }
 
   isDownloading = true;
+  downloadingVoice = voiceName;
   currentProgress = 0;
   console.log(`[Piper Download] Starting download for voice "${voiceName}"...`);
   const targetPath = getVoicePath(voiceName);
@@ -153,11 +159,12 @@ export async function downloadPiperVoice(
 
         // 1. Download JSON config
         const jsonRes = await fetchWithRetry(urls.json, undefined, 2, 1000);
-        if (jsonRes.ok) {
-          const jsonText = await jsonRes.text();
-          const jsonPath = path.join(getVoicesDir(), `${voiceName}.onnx.json`);
-          fs.writeFileSync(jsonPath, jsonText, 'utf-8');
+        if (!jsonRes.ok) {
+          throw new Error(`Failed to download Piper JSON config: HTTP ${jsonRes.status}`);
         }
+        const jsonText = await jsonRes.text();
+        const jsonPath = path.join(getVoicesDir(), `${voiceName}.onnx.json`);
+        fs.writeFileSync(jsonPath, jsonText, 'utf-8');
 
         // 2. Download ONNX model file
         const res = await fetchWithRetry(urls.onnx, undefined, 2, 1000);
@@ -220,7 +227,7 @@ export async function downloadPiperVoice(
 
     currentProgress = 100;
     isDownloading = false;
-    console.log(`[Piper Download] Successfully downloaded voice "${voiceName}" to ${targetPath}.`);
+    downloadingVoice = null;
     if (onProgress) {
       onProgress(100, `Piper voice ${voiceName} download complete.`);
     }
@@ -233,6 +240,7 @@ export async function downloadPiperVoice(
       // ignore
     }
     isDownloading = false;
+    downloadingVoice = null;
     return false;
   }
 }

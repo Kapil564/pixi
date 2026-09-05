@@ -1,0 +1,9 @@
+node_modules
+dist
+release
+.git
+.vscode
+assistant.db*
+*.log
+*.tmp
+saira-assistant-*.tgz

@@ -25,6 +25,7 @@ const WHISPER_WINDOWS_BIN_URL = 'https://github.com/ggml-org/whisper.cpp/release
 
 let currentModel = process.env.WHISPER_LOCAL_MODEL || 'small.en';
 let isDownloading = false;
+let downloadingModel: string | null = null;
 let currentProgress = 0;
 
 /**
@@ -248,11 +249,16 @@ export async function downloadWhisperModel(
   }
 
   if (isDownloading) {
-    console.log('[Whisper Download] Download already in progress.');
-    return true;
+    if (downloadingModel === modelName) {
+      console.log('[Whisper Download] Same model download already in progress.');
+      return true;
+    }
+    console.log(`[Whisper Download] Different model "${modelName}" requested but "${downloadingModel}" is downloading. Waiting...`);
+    return false;
   }
 
   isDownloading = true;
+  downloadingModel = modelName;
   currentProgress = 0;
   console.log(`[Whisper Download] Starting download for model "${modelName}" from ${url}...`);
   const targetPath = getModelPath(modelName);
@@ -326,7 +332,7 @@ export async function downloadWhisperModel(
 
     currentProgress = 100;
     isDownloading = false;
-    console.log(`[Whisper Download] Successfully downloaded Whisper model "${modelName}" to ${targetPath}.`);
+    downloadingModel = null;
     if (onProgress) {
       onProgress(100, `Whisper model ${modelName} download complete.`);
     }
@@ -339,6 +345,7 @@ export async function downloadWhisperModel(
       // ignore
     }
     isDownloading = false;
+    downloadingModel = null;
     return false;
   }
 }

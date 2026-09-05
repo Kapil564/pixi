@@ -29,12 +29,36 @@ export function assertDbReady(): void {
   }
 }
 
-try {
-  migrate(db, { migrationsFolder: paths.migrationsFolder });
-  dbStatus = { status: 'ready', errorText: null };
-  console.log('[DB] Auto-migration check completed successfully.');
-} catch (err) {
-  const errMsg = err instanceof Error ? err.message : String(err);
-  dbStatus = { status: 'error', errorText: errMsg };
-  console.error('[DB] Auto-migration error on database init:', errMsg);
+export function retryMigration(): boolean {
+  try {
+    dbStatus = { status: 'migrating', errorText: null };
+    migrate(db, { migrationsFolder: paths.migrationsFolder });
+    dbStatus = { status: 'ready', errorText: null };
+    console.log('[DB] Retry migration succeeded.');
+    return true;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    dbStatus = { status: 'error', errorText: errMsg };
+    console.error('[DB] Retry migration failed:', errMsg);
+    return false;
+  }
 }
+
+function runInitialMigration(attempt = 1, maxAttempts = 3): void {
+  try {
+    migrate(db, { migrationsFolder: paths.migrationsFolder });
+    dbStatus = { status: 'ready', errorText: null };
+    console.log('[DB] Auto-migration check completed successfully.');
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (attempt < maxAttempts) {
+      console.warn(`[DB] Migration attempt ${attempt}/${maxAttempts} failed: ${errMsg}. Retrying in 1s...`);
+      setTimeout(() => runInitialMigration(attempt + 1, maxAttempts), 1000);
+    } else {
+      dbStatus = { status: 'error', errorText: errMsg };
+      console.error(`[DB] Auto-migration failed after ${maxAttempts} attempts:`, errMsg);
+    }
+  }
+}
+
+runInitialMigration();

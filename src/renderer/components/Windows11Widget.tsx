@@ -23,6 +23,12 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [showResultCard, setShowResultCard] = useState(true);
+  const prevResponseRef = React.useRef(responseMessage);
+
+  if (responseMessage !== prevResponseRef.current) {
+    prevResponseRef.current = responseMessage;
+    if (responseMessage) setShowResultCard(true);
+  }
 
   const isListening = phase === 'listening';
   const isThinking = phase === 'thinking';

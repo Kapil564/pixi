@@ -181,9 +181,11 @@ app.whenReady().then(async () => {
     console.log('[Main] Saira launched silently into System Tray (--hidden).');
   }
 
-  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+  if (!globalShortcut.register('CommandOrControl+Shift+Space', () => {
     toggleWindow();
-  });
+  })) {
+    console.warn('[Main] Failed to register global shortcut Ctrl+Shift+Space (may be taken by another app).');
+  }
 
   // 4. Initialize Orchestrator & Background Scheduler
   const orchestrator = await createOrchestrator();

@@ -96,7 +96,7 @@ export async function extractAndStoreFacts(params: {
     const memoryDir = getAppPaths().memoryDir;
 
     for (const item of facts) {
-      if (!item.fact || !item.target_file || (item.confidence && item.confidence < 0.75)) {
+      if (!item.fact || !item.target_file || (item.confidence != null && item.confidence < 0.75)) {
         continue;
       }
 

@@ -360,7 +360,10 @@ export async function saveFactToMemory(params: {
     } else {
       // Check for exact/near duplicate
       const lowerNew = newFactClean.toLowerCase();
-      const existingIdx = bullets.findIndex((b) => b.toLowerCase().includes(lowerNew) || lowerNew.includes(b.toLowerCase()));
+      const existingIdx = bullets.findIndex((b) => {
+        const bLower = b.toLowerCase();
+        return bLower === lowerNew || (lowerNew.includes(bLower) && bLower.length >= lowerNew.length * 0.8);
+      });
 
       if (existingIdx !== -1) {
         // If it's similar, update to the newer wording

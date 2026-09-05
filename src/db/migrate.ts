@@ -12,3 +12,4 @@ const db = drizzle(sqlite);
 
 migrate(db, { migrationsFolder: paths.migrationsFolder });
 console.log('Migration complete.');
+sqlite.close();

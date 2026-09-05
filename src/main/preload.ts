@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+const listenerMap = new Map<string, (...args: any[]) => void>();
+
+function safeOn(channel: string, cb: (...args: any[]) => void) {
+  const wrapped = (_event: any, ...args: any[]) => cb(...args);
+  listenerMap.set(`${channel}:${cb.toString().slice(0, 50)}`, wrapped);
+  ipcRenderer.on(channel, wrapped);
+  return () => {
+    ipcRenderer.removeListener(channel, wrapped);
+  };
+}
+
 contextBridge.exposeInMainWorld('assistant', {
   showWindow: () => ipcRenderer.send('show-window'),
   hideWindow: () => ipcRenderer.send('hide-window'),
@@ -25,11 +36,23 @@ contextBridge.exposeInMainWorld('assistant', {
   setSttModel: (modelName: string) => ipcRenderer.invoke('stt:set-model', modelName),
   setTtsVoice: (voiceName: string) => ipcRenderer.invoke('tts:set-voice', voiceName),
   onTranscript: (cb: (data: { text: string }) => void) =>
-    ipcRenderer.on('transcript', (_event, data) => cb(data)),
+    safeOn('transcript', cb),
+  offTranscript: (cb: (data: { text: string }) => void) => {
+    ipcRenderer.removeAllListeners('transcript');
+  },
   onResponse: (cb: (response: { spoken?: string; display?: string }) => void) =>
-    ipcRenderer.on('response', (_event, data) => cb(data)),
+    safeOn('response', cb),
+  offResponse: () => {
+    ipcRenderer.removeAllListeners('response');
+  },
   onWindowShown: (cb: () => void) =>
-    ipcRenderer.on('window-shown', () => cb()),
+    safeOn('window-shown', cb),
+  offWindowShown: () => {
+    ipcRenderer.removeAllListeners('window-shown');
+  },
   onSetupProgress: (cb: (data: { progress: number; text: string }) => void) =>
-    ipcRenderer.on('setup:progress', (_event, data) => cb(data)),
+    safeOn('setup:progress', cb),
+  offSetupProgress: () => {
+    ipcRenderer.removeAllListeners('setup:progress');
+  },
 });

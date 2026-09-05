@@ -54,6 +54,7 @@ function playWakeChime() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
+    osc.onended = () => { ctx.close().catch(() => {}); };
   } catch {
     // ignore audio context error
   }
@@ -519,6 +520,8 @@ function App() {
     const assistant = (window as any).assistant;
     if (!assistant) return;
 
+    const cleanups: (() => void)[] = [];
+
     const handleReactivate = () => {
       console.log('[Renderer] Window reactivated. Resuming audio contexts...');
       if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
@@ -532,8 +535,12 @@ function App() {
     assistant.onWindowShown?.(handleReactivate);
     window.addEventListener('focus', handleReactivate);
     document.addEventListener('visibilitychange', handleReactivate);
+    cleanups.push(() => {
+      window.removeEventListener('focus', handleReactivate);
+      document.removeEventListener('visibilitychange', handleReactivate);
+    });
 
-    assistant.onTranscript?.((data: { text: string }) => {
+    const offTranscript = assistant.onTranscript?.((data: { text: string }) => {
       if (data.text) {
         addMessage('user', data.text);
         setStatus('🧠 Thinking...');
@@ -544,8 +551,9 @@ function App() {
         restartVoiceListener();
       }
     });
+    if (offTranscript) cleanups.push(offTranscript);
 
-    assistant.onResponse?.((response: { spoken?: string; display?: string }) => {
+    const offResponse = assistant.onResponse?.((response: { spoken?: string; display?: string }) => {
       addMessage('saira', response.display || response.spoken || 'Done.');
       setStatus('');
       if (response.spoken && response.spoken.trim()) {
@@ -561,10 +569,10 @@ function App() {
         restartVoiceListener();
       }
     });
+    if (offResponse) cleanups.push(offResponse);
 
     return () => {
-      window.removeEventListener('focus', handleReactivate);
-      document.removeEventListener('visibilitychange', handleReactivate);
+      cleanups.forEach((fn) => fn());
       cleanupWorkletUrl();
     };
   }, [viewMode]);

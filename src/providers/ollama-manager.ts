@@ -151,10 +151,11 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
     if (res.ok) {
       const data = (await res.json()) as { models?: Array<{ name: string }> };
       if (Array.isArray(data.models)) {
-        modelDownloaded = data.models.some((m) =>
-          m.name.toLowerCase().includes(DEFAULT_LOCAL_MODEL.toLowerCase()) ||
-          DEFAULT_LOCAL_MODEL.toLowerCase().includes(m.name.toLowerCase())
-        );
+        modelDownloaded = data.models.some((m) => {
+          const modelName = m.name.toLowerCase();
+          const expected = DEFAULT_LOCAL_MODEL.toLowerCase();
+          return modelName === expected || modelName.startsWith(expected + ':') || modelName.startsWith(expected + '-');
+        });
       }
     }
   } catch (err) {

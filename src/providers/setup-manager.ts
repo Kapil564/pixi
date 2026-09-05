@@ -3,7 +3,7 @@ import { getWhisperStatus, downloadWhisperModel, downloadWhisperBinary, type Whi
 import { getPiperStatus, downloadPiperVoice, downloadPiperBinary, type PiperStatus } from './piper-manager';
 import { checkFreeDiskSpace } from '../shared/disk-util';
 import { checkSystemRequirements, type SystemRequirementsResult } from '../shared/sys-check';
-import { getDatabaseStatus, type DatabaseStatus } from '../db';
+import { getDatabaseStatus, retryMigration, type DatabaseStatus } from '../db';
 import { config } from '../shared/config';
 import { logErrorToFile } from '../shared/error-logger';
 import { saveSettings } from '../shared/settings-store';
@@ -236,9 +236,21 @@ export async function runFullSetupSequence(
     isSettingUp = false;
     lastSetupError = null;
     addSetupLog('3-step setup sequence completed successfully.');
-    try {
-      saveSettings({ onboardingCompleted: true });
-    } catch {}
+
+    let dbStatus = getDatabaseStatus();
+    if (dbStatus.status !== 'ready') {
+      addSetupLog('DB not ready after downloads, retrying migration...');
+      retryMigration();
+      dbStatus = getDatabaseStatus();
+    }
+    if (dbStatus.status === 'ready') {
+      try {
+        saveSettings({ onboardingCompleted: true });
+      } catch {}
+    } else {
+      lastSetupError = `Setup completed but database failed: ${dbStatus.errorText}`;
+      addSetupLog(lastSetupError);
+    }
     if (onProgress) {
       onProgress(100, 'Saira local offline models fully set up!');
     }

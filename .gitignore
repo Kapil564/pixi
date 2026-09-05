@@ -2,7 +2,7 @@
 .drizzle/
 dist/
 node_modules/
-release/
 .env
 assistant.db
 *.log
+release/

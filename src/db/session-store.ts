@@ -1,5 +1,5 @@
 import { eq, asc, inArray, count, isNull } from 'drizzle-orm';
-import { db } from './index';
+import { db, assertDbReady } from './index';
 import { sessions, messages } from './schema';
 
 export interface DbMessage {
@@ -22,6 +22,7 @@ export interface DbSession {
  * Creates a new session record in SQLite and returns its ID.
  */
 export function createSession(): number {
+  assertDbReady();
   const result = db.insert(sessions).values({
     startedAt: new Date().toISOString(),
     endedAt: null,
@@ -34,6 +35,7 @@ export function createSession(): number {
  * Marks a session as ended by setting endedAt to the current timestamp.
  */
 export function endSession(sessionId: number): void {
+  assertDbReady();
   db.update(sessions)
     .set({ endedAt: new Date().toISOString() })
     .where(eq(sessions.id, sessionId))
@@ -44,6 +46,7 @@ export function endSession(sessionId: number): void {
  * Gets the active open session (where endedAt is null) or creates a new one.
  */
 export function getActiveOrCreateSession(): number {
+  assertDbReady();
   const activeSession = db.select()
     .from(sessions)
     .where(isNull(sessions.endedAt))
@@ -65,6 +68,7 @@ export function addMessage(params: {
   content: string;
   tokenCount?: number;
 }): number {
+  assertDbReady();
   const result = db.insert(messages).values({
     sessionId: params.sessionId,
     role: params.role,
@@ -80,6 +84,7 @@ export function addMessage(params: {
  * Retrieves all messages for a session ordered by ID ascending.
  */
 export function getSessionMessages(sessionId: number): DbMessage[] {
+  assertDbReady();
   return db.select()
     .from(messages)
     .where(eq(messages.sessionId, sessionId))
@@ -100,6 +105,7 @@ export function getRecentSessionMessages(sessionId: number, limit: number): DbMe
  * Gets total message count for a session.
  */
 export function getSessionMessageCount(sessionId: number): number {
+  assertDbReady();
   const result = db.select({ value: count() })
     .from(messages)
     .where(eq(messages.sessionId, sessionId))
@@ -111,6 +117,7 @@ export function getSessionMessageCount(sessionId: number): number {
  * Fetches current summary for a session.
  */
 export function getSessionSummary(sessionId: number): string | null {
+  assertDbReady();
   const sessionRecord = db.select({ summary: sessions.summary })
     .from(sessions)
     .where(eq(sessions.id, sessionId))
@@ -122,6 +129,7 @@ export function getSessionSummary(sessionId: number): string | null {
  * Updates the summary string for a session.
  */
 export function updateSessionSummary(sessionId: number, summary: string): void {
+  assertDbReady();
   db.update(sessions)
     .set({ summary })
     .where(eq(sessions.id, sessionId))
@@ -142,6 +150,7 @@ export function getOlderMessagesToPrune(sessionId: number, keepCount: number): D
  */
 export function deleteMessagesByIds(ids: number[]): void {
   if (ids.length === 0) return;
+  assertDbReady();
   db.delete(messages)
     .where(inArray(messages.id, ids))
     .run();

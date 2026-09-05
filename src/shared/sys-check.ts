@@ -75,7 +75,8 @@ export function checkSystemRequirements(): SystemRequirementsResult {
   }
 
   // System is treated as compatible so hardware specs output terminal warnings without blocking UI setup
-  const isCompatible = true;
+  // Exception: non-Windows platforms are flagged as incompatible
+  const isCompatible = isWindows && errors.length === 0;
 
   return {
     isCompatible,

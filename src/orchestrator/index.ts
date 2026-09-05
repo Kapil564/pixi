@@ -7,7 +7,7 @@ import { executeIntent } from '../actions/executor';
 import { createSTTRouter } from '../providers/stt-router';
 import { createLLMRouter } from '../providers/llm-router';
 import { createTTSRouter } from '../providers/tts-router';
-import { ensureFullSetupReady } from '../providers/setup-manager';
+import { ensureFullSetupReady, getFullSetupStatus } from '../providers/setup-manager';
 import { type TTSProvider } from '../providers/tts';
 import { config } from '../shared/config';
 import { initMemoryStorage } from '../memory/markdown-memory';
@@ -68,6 +68,9 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     console.log(`[Session] Active SQLite Session #${sessionId}`);
 
     let activeRequestId = 0;
+    let setupReady = false;
+
+    getFullSetupStatus().then((s) => { setupReady = s.isComplete; });
 
     const cancelActivePipeline = () => {
       activeRequestId++;
@@ -80,6 +83,14 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     });
 
     socket.on('audio', async (audioBuffer: Buffer) => {
+      if (!setupReady) {
+        const s = await getFullSetupStatus();
+        setupReady = s.isComplete;
+        if (!setupReady) {
+          socket.emit('response', { spoken: 'Setup is still in progress. Please wait for models to download.', display: 'Setup in progress...' });
+          return;
+        }
+      }
       cancelActivePipeline();
       const currentReqId = activeRequestId;
 
@@ -176,6 +187,14 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     });
 
     socket.on('text', async (text: string) => {
+      if (!setupReady) {
+        const s = await getFullSetupStatus();
+        setupReady = s.isComplete;
+        if (!setupReady) {
+          socket.emit('response', { spoken: 'Setup is still in progress. Please wait for models to download.', display: 'Setup in progress...' });
+          return;
+        }
+      }
       cancelActivePipeline();
       const currentReqId = activeRequestId;
 

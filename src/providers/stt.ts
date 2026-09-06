@@ -223,7 +223,7 @@ function findExecutableInPath(name: string): string | undefined {
 }
 
 function writeTempWav(buffer: Buffer): string {
-  const tmp = path.join(os.tmpdir(), `saira_stt_${Date.now()}.wav`);
+  const tmp = path.join(os.tmpdir(), `pixi_stt_${Date.now()}.wav`);
   fs.writeFileSync(tmp, buffer);
   return tmp;
 }
@@ -231,7 +231,7 @@ function writeTempWav(buffer: Buffer): string {
 function transcribeWithWhisperCli(audioBuffer: Buffer, cliBinary: string, modelPath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const tmpWav = writeTempWav(audioBuffer);
-    const outputPrefix = path.join(os.tmpdir(), `saira_whisper_${Date.now()}`);
+    const outputPrefix = path.join(os.tmpdir(), `pixi_whisper_${Date.now()}`);
     const outputTxt = `${outputPrefix}.txt`;
     const args = [
       '-m', modelPath,

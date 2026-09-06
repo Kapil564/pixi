@@ -7,6 +7,7 @@ import { getDatabaseStatus, retryMigration, type DatabaseStatus } from '../db';
 import { config } from '../shared/config';
 import { logErrorToFile } from '../shared/error-logger';
 import { saveSettings } from '../shared/settings-store';
+import { migrateLegacyModelAssets } from '../shared/model-migration';
 
 export interface SetupStatus {
   isComplete: boolean;
@@ -51,6 +52,7 @@ export function addSetupLog(msg: string): void {
  * Returns complete setup status combining Ollama LLM (~2GB), Whisper STT (~460MB), Piper TTS (~50-60MB), Disk Space, System Specs, and DB Health.
  */
 export async function getFullSetupStatus(): Promise<SetupStatus> {
+  migrateLegacyModelAssets();
   const system = checkSystemRequirements();
   const dbStatus = getDatabaseStatus();
   const disk = checkFreeDiskSpace();
@@ -75,7 +77,7 @@ export async function getFullSetupStatus(): Promise<SetupStatus> {
     overallProgress = Math.round(oPart + wPart + pPart);
   }
 
-  let stepText = 'Saira local offline models are fully set up and ready.';
+  let stepText = 'pixi local offline models are fully set up and ready.';
   if (dbStatus.status === 'error') {
     stepText = `Database initialization error: ${dbStatus.errorText}`;
   } else if (lastSetupError) {
@@ -88,12 +90,12 @@ export async function getFullSetupStatus(): Promise<SetupStatus> {
     } else if (!ollama.running) {
       stepText = 'Ollama is installed but not running. Start Ollama ("ollama serve") to download local model.';
     } else {
-      stepText = `Setting up Saira (1/3): Pulling Ollama LLM model (${ollama.downloadProgress}%)...`;
+      stepText = `Setting up pixi (1/3): Pulling Ollama LLM model (${ollama.downloadProgress}%)...`;
     }
   } else if (!whisperReady) {
-    stepText = `Setting up Saira (2/3): Downloading Whisper STT binary & model (${whisper.downloadProgress}%)...`;
+    stepText = `Setting up pixi (2/3): Downloading Whisper STT binary & model (${whisper.downloadProgress}%)...`;
   } else if (!piperReady) {
-    stepText = `Setting up Saira (3/3): Downloading Piper TTS binary & voice model (${piper.downloadProgress}%)...`;
+    stepText = `Setting up pixi (3/3): Downloading Piper TTS binary & voice model (${piper.downloadProgress}%)...`;
   }
 
   if (isComplete) {
@@ -132,6 +134,7 @@ export async function runFullSetupSequence(
   isSettingUp = true;
   lastSetupError = null;
   addSetupLog('Starting 3-step unified first-run setup sequence...');
+  migrateLegacyModelAssets();
 
   try {
     // 0a. System Requirements check (warnings logged to terminal console, non-blocking for UI)
@@ -252,7 +255,7 @@ export async function runFullSetupSequence(
       addSetupLog(lastSetupError);
     }
     if (onProgress) {
-      onProgress(100, 'Saira local offline models fully set up!');
+      onProgress(100, 'pixi local offline models fully set up!');
     }
     return true;
   } catch (err) {

@@ -1,6 +1,6 @@
-# Saira — System Architecture
+# pixi — System Architecture
 
-**Saira** is a modular, voice-activated Windows desktop assistant designed with Electron, React, TypeScript, SQLite, Mem0 Agentic Memory, and a pluggable AI provider architecture (STT, LLM, TTS).
+**pixi** is a modular, voice-activated Windows desktop assistant designed with Electron, React, TypeScript, SQLite, Mem0 Agentic Memory, and a pluggable AI provider architecture (STT, LLM, TTS).
 
 ---
 
@@ -59,15 +59,15 @@ graph TD
 
 ## 2. Core Subsystems
 
-### A. Main Desktop Process & Window Management ([src/main/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/main/index.ts))
+### A. Main Desktop Process & Window Management ([src/main/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/main/index.ts))
 - **Tray & Global Hotkey**: Registers Windows System Tray icon and `Ctrl+Shift+Space` global shortcut to toggle the floating voice window.
-- **IPC Isolation**: Uses Electron `contextBridge` ([src/main/preload.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/main/preload.ts)) to separate secure native Node APIs from the web renderer.
+- **IPC Isolation**: Uses Electron `contextBridge` ([src/main/preload.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/main/preload.ts)) to separate secure native Node APIs from the web renderer.
 
-### B. Voice Interface & Renderer ([src/renderer/index.tsx](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/renderer/index.tsx))
+### B. Voice Interface & Renderer ([src/renderer/index.tsx](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/renderer/index.tsx))
 - **Audio Capture**: Utilizes browser `navigator.mediaDevices.getUserMedia` and `MediaRecorder` API to record voice input into WAV chunks.
 - **WebSocket Streaming**: Streams binary audio data over Socket.io to the orchestrator.
 
-### C. Pipeline Orchestrator ([src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/orchestrator/index.ts))
+### C. Pipeline Orchestrator ([src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/orchestrator/index.ts))
 The central engine that manages the end-to-end pipeline execution:
 1. Receives audio buffer from socket.
 2. Invokes **STT** provider to convert audio into text (`transcribe`).
@@ -76,7 +76,7 @@ The central engine that manages the end-to-end pipeline execution:
 5. Invokes **TTS** provider to synthesize speech output (`speak`).
 6. Buffers conversation turns in memory for post-session memory consolidation.
 
-### D. Pluggable Providers ([src/providers/](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers))
+### D. Pluggable Providers ([src/providers/](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers))
 Each AI task is decoupled into independent provider interfaces with automatic fallback:
 
 | Provider Type | Supported Engines | Automatic Fallback |
@@ -85,16 +85,16 @@ Each AI task is decoupled into independent provider interfaces with automatic fa
 | **Intent Model (LLM)** | OpenAI (`gpt-4o-mini`), Google Gemini, Groq (Llama), Cloudflare Workers AI (`@cf/meta/llama-3.1-8b-instruct`), Ollama | Local Ollama (`llama3.1`) |
 | **Text-to-Speech (TTS)** | Windows SAPI5 (offline native), Fish Audio (`https://api.fish.audio/v1/tts`), ElevenLabs, Cloudflare Workers AI (`elevenlabs/eleven-multilingual-v2`), Azure Neural TTS | Windows SAPI5 (Powershell `System.Speech`) |
 
-### E. Agentic Memory & Persistence ([src/memory/](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/memory))
+### E. Agentic Memory & Persistence ([src/memory/](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/memory))
 - **Mem0 Agentic Memory DB**: Cloud-backed AI memory engine (`api.mem0.ai`) for dynamic memory extraction, graph deduplication, and conflict resolution.
-- **Local Context Cache ([`user_context.md`](file:///c:/Users/kapil/Desktop/space/saira-assistant/user_context.md))**: Fast startup knowledge base loaded directly into LLM prompts (0ms turn latency).
-- **Post-Session Memory Summarizer ([`src/memory/summarizer.ts`](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/memory/summarizer.ts))**: Asynchronous post-session worker that pushes transcripts to Mem0 and syncs active memories back to `user_context.md`.
+- **Local Context Cache ([`user_context.md`](file:///c:/Users/kapil/Desktop/space/pixi-assistant/user_context.md))**: Fast startup knowledge base loaded directly into LLM prompts (0ms turn latency).
+- **Post-Session Memory Summarizer ([`src/memory/summarizer.ts`](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/memory/summarizer.ts))**: Asynchronous post-session worker that pushes transcripts to Mem0 and syncs active memories back to `user_context.md`.
 
-### F. Action Executor & Storage ([src/actions/](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/actions) & [src/db/](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/db))
+### F. Action Executor & Storage ([src/actions/](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/actions) & [src/db/](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/db))
 - **Action Executor**: Takes validated intent JSON (e.g. `reminder.create`, `todo.create`, `chat.respond`) and performs the underlying operations.
 - **Database**: Local SQLite database using `better-sqlite3` and `drizzle-orm` storing `reminders` and `todos` tables.
 
-### G. Background Scheduler ([src/orchestrator/scheduler.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/orchestrator/scheduler.ts))
+### G. Background Scheduler ([src/orchestrator/scheduler.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/orchestrator/scheduler.ts))
 - Runs background cron jobs to check for due reminders in SQLite.
 - Triggers native Windows desktop notifications via `node-notifier` and speaks alert text via TTS.
 
@@ -137,7 +137,7 @@ sequenceDiagram
     Renderer->>Orch: socket.on('disconnect')
     Orch->>Mem0: POST /v1/memories/ (Session transcript)
     Mem0-->>Orch: Memory processing queued
-    Orch->>Mem0: GET /v1/memories/?user_id=saira_user
+    Orch->>Mem0: GET /v1/memories/?user_id=pixi_user
     Mem0-->>Orch: Active facts list
     Orch->>Context: Write updated user_context.md
 ```
@@ -147,7 +147,7 @@ sequenceDiagram
 ## 4. Directory Map
 
 ```text
-saira-assistant/
+pixi-assistant/
 ├── assets/                  # App icons and media assets
 ├── user_context.md          # Local cached user knowledge base for LLM prompts
 ├── src/
@@ -173,7 +173,7 @@ The voice pipeline executes in a modular, streaming sequence. Below is the laten
 | Pipeline Step | Provider / Component | Expected Latency | Description |
 |---|---|---|---|
 | **1. Voice Activity & Pause Detection (VAD)** | Client AudioWorklet / ScriptProcessor | **0ms – 4,000ms** | Detects vocal energy RMS (`> 0.015`). Automatically triggers auto-send to LLM after **4 seconds of continuous silence** following speech. |
-| **2. Client Audio Encoding (PCM to WAV)** | Renderer [`encodeWav`](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/renderer/index.tsx) | **10ms – 30ms** | Packs Float32Array PCM chunks into 16kHz mono WAV audio buffer. |
+| **2. Client Audio Encoding (PCM to WAV)** | Renderer [`encodeWav`](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/renderer/index.tsx) | **10ms – 30ms** | Packs Float32Array PCM chunks into 16kHz mono WAV audio buffer. |
 | **3. IPC & Socket.io Transport** | Localhost Socket.io Bridge (Port 16123) | **2ms – 5ms** | Binary buffer transport from Electron renderer to Node.js orchestrator. |
 | **4. Speech-to-Text (STT) Transcription** | Groq Whisper (`whisper-large-v3`) | **150ms – 300ms** | Fast cloud speech recognition. |
 | | Cloudflare Workers AI (`@cf/openai/whisper`) | **300ms – 600ms** | Cloudflare Workers AI transcription. |

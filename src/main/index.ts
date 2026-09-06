@@ -82,7 +82,7 @@ function updateTrayMenu() {
   if (!tray) return;
   const autostartActive = isAutostartEnabled();
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open Saira', click: toggleWindow },
+    { label: 'Open pixi', click: toggleWindow },
     {
       label: 'Autostart on Login',
       type: 'checkbox',
@@ -93,7 +93,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Quit Saira',
+      label: 'Quit pixi',
       click: () => {
         isQuitting = true;
         app.quit();
@@ -166,7 +166,7 @@ app.on('before-quit', () => {
 app.whenReady().then(async () => {
   // 1. Configure System Tray
   tray = new Tray(getAppIcon());
-  tray.setToolTip('Saira');
+  tray.setToolTip('pixi');
   tray.on('click', toggleWindow);
   updateTrayMenu();
 
@@ -178,7 +178,7 @@ app.whenReady().then(async () => {
   if (!startHidden) {
     toggleWindow();
   } else {
-    console.log('[Main] Saira launched silently into System Tray (--hidden).');
+    console.log('[Main] pixi launched silently into System Tray (--hidden).');
   }
 
   if (!globalShortcut.register('CommandOrControl+Shift+Space', () => {
@@ -235,6 +235,14 @@ function getSocket(): Socket {
 
     socket.on('response', (data) => {
       window?.webContents.send('response', data);
+    });
+
+    socket.on('speaking_start', () => {
+      window?.webContents.send('speaking-start');
+    });
+
+    socket.on('speaking_stop', () => {
+      window?.webContents.send('speaking-stop');
     });
 
     socket.on('error', (data) => {

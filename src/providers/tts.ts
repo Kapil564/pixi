@@ -8,7 +8,7 @@ import { getAppPaths } from '../shared/paths';
 
 export interface TTSProvider {
   name: string;
-  speak(text: string): Promise<void>;
+  speak(text: string, onStart?: () => void): Promise<void>;
   stop(): void;
 }
 
@@ -37,16 +37,27 @@ function spawnPowerShellScript(script: string): ChildProcess {
   });
 }
 
-function playAudioBuffer(buffer: Buffer): Promise<void> {
+function playAudioBuffer(buffer: Buffer, onStart?: () => void): Promise<void> {
   playbackQueue = playbackQueue.then(async () => {
     stopActivePlayback();
     const isMp3 = buffer.slice(0, 3).toString('utf8') === 'ID3' || buffer[0] === 0xff;
     const ext = isMp3 ? 'mp3' : 'wav';
-    const tempFile = path.join(os.tmpdir(), `saira_speech_${Date.now()}.${ext}`);
+    const tempFile = path.join(os.tmpdir(), `pixi_speech_${Date.now()}.${ext}`);
     fs.writeFileSync(tempFile, buffer);
+
+    if (onStart) {
+      try { onStart(); } catch {}
+    }
 
     await new Promise<void>((resolve) => {
       const script = `
+        if ("${ext}" -eq "wav") {
+          try {
+            $sp = New-Object System.Media.SoundPlayer("${tempFile.replace(/\\/g, '\\\\')}")
+            $sp.PlaySync()
+            exit 0
+          } catch {}
+        }
         try {
           Add-Type -AssemblyName presentationCore
           $player = New-Object System.Windows.Media.MediaPlayer
@@ -105,7 +116,7 @@ export class PiperLocalTTS implements TTSProvider {
   public name = 'local-piper';
   private child: ChildProcess | null = null;
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     const activeVoice = getSelectedVoiceName();
     const voicePath = getVoicePath(activeVoice);
     const downloaded = isVoiceDownloaded(activeVoice);
@@ -131,7 +142,7 @@ export class PiperLocalTTS implements TTSProvider {
 
     return new Promise((resolve, reject) => {
       try {
-        const outputWav = path.join(os.tmpdir(), `saira_piper_${Date.now()}.wav`);
+        const outputWav = path.join(os.tmpdir(), `pixi_piper_${Date.now()}.wav`);
         const configJsonPath = `${voicePath}.json`;
         const args = ['-m', voicePath, '-f', outputWav];
         if (fs.existsSync(configJsonPath)) {
@@ -156,7 +167,7 @@ export class PiperLocalTTS implements TTSProvider {
             try {
               const buffer = fs.readFileSync(outputWav);
               cleanupPiperFiles(outputWav);
-              await playAudioBuffer(buffer);
+              await playAudioBuffer(buffer, onStart);
               resolve();
             } catch (err) {
               cleanupPiperFiles(outputWav);
@@ -208,10 +219,10 @@ export class FishAudioTTS implements TTSProvider {
     this.fallback = createFallbackTTS();
   }
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     const key = this.apiKey || config.tts.fishAudioKey;
     if (!key) {
-      return this.fallback.speak(text);
+      return this.fallback.speak(text, onStart);
     }
 
     try {
@@ -233,7 +244,7 @@ export class FishAudioTTS implements TTSProvider {
         chunks.push(Buffer.from(chunk));
       }
       const buffer = Buffer.concat(chunks);
-      await playAudioBuffer(buffer);
+      await playAudioBuffer(buffer, onStart);
     } catch (sdkErr) {
       console.warn('[Fish Audio SDK Warning]:', sdkErr, '. Attempting direct REST fetch fallback...');
       try {
@@ -261,7 +272,7 @@ export class FishAudioTTS implements TTSProvider {
         }
 
         const buffer = Buffer.from(await response.arrayBuffer());
-        await playAudioBuffer(buffer);
+        await playAudioBuffer(buffer, onStart);
       } catch (err) {
         throw err;
       }
@@ -284,7 +295,7 @@ export class ElevenLabsTTS implements TTSProvider {
     this.voiceId = voiceId || 'C8uRRxxNZH0vRqJbVFJy';
   }
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     if (!this.apiKey) throw new Error('ElevenLabs API key is missing.');
 
     const response = await fetch(
@@ -309,7 +320,7 @@ export class ElevenLabsTTS implements TTSProvider {
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    await playAudioBuffer(buffer);
+    await playAudioBuffer(buffer, onStart);
   }
 
   stop(): void {
@@ -327,7 +338,7 @@ export class AzureTTS implements TTSProvider {
     this.region = region;
   }
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     if (!this.apiKey || !this.region) {
       throw new Error('Azure Speech key and region are required.');
     }
@@ -395,7 +406,7 @@ export class CloudflareElevenLabsTTS implements TTSProvider {
     this.voiceId = voiceId || 'QTKSa2Iyv0yoxvXY2V8a';
   }
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     if (!this.accountId || !this.apiToken) {
       throw new Error('Cloudflare account ID and API token are required.');
     }
@@ -437,7 +448,7 @@ export class CloudflareElevenLabsTTS implements TTSProvider {
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    await playAudioBuffer(buffer);
+    await playAudioBuffer(buffer, onStart);
   }
 
   stop(): void {

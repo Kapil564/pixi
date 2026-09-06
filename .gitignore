@@ -6,3 +6,4 @@ node_modules/
 assistant.db
 *.log
 release/
+err.txt

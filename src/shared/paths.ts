@@ -5,8 +5,8 @@ import * as path from 'node:path';
 /**
  * Resolves the OS-appropriate per-user app data directory:
  * - Electron main process: app.getPath('userData')
- * - Fallback (CLI / non-Electron / node process): %APPDATA%\Saira on Windows
- *   or ~/.config/saira on Linux/macOS
+ * - Fallback (CLI / non-Electron / node process): %APPDATA%\pixi on Windows
+ *   or ~/.config/pixi on Linux/macOS
  */
 export function getUserDataDir(): string {
   // If running inside Electron main process
@@ -22,11 +22,11 @@ export function getUserDataDir(): string {
 
   // Windows per-user AppData environment variable
   if (process.env.APPDATA) {
-    return path.join(process.env.APPDATA, 'Saira');
+    return path.join(process.env.APPDATA, 'pixi');
   }
 
   // Fallback using os.homedir() for Windows
-  return path.join(os.homedir(), 'AppData', 'Roaming', 'Saira');
+  return path.join(os.homedir(), 'AppData', 'Roaming', 'pixi');
 }
 
 export interface AppPaths {

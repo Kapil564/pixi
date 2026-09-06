@@ -6,4 +6,4 @@ release
 assistant.db*
 *.log
 *.tmp
-saira-assistant-*.tgz
+pixi-assistant-*.tgz

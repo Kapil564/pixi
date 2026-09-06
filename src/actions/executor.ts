@@ -12,7 +12,7 @@ import type { AssistantResponse, IntentResult } from '../shared/types';
 export async function executeIntent(intent: IntentResult): Promise<AssistantResponse> {
   switch (intent.intent) {
     case 'chat.respond': {
-      const msg = intent.params?.message || '';
+      const msg = intent.params?.message || (intent as any).message || (intent as any).response || (intent as any).text || '';
       return { spoken: msg, display: msg };
     }
 

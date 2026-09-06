@@ -59,7 +59,7 @@ export class LLMRouter implements LLMProvider {
 
           // Light notification to user
           notifier.notify({
-            title: 'Saira Offline Mode',
+            title: 'pixi Offline Mode',
             message: 'API rate limit reached. Switched to local model for this turn.',
             sound: false,
           });

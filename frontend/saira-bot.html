@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Saira — Interactive Voice Demo</title>
-  <meta name="description" content="Experience Saira's state machine and voice interaction demo in your browser.">
+  <title>pixi — Interactive Voice Demo</title>
+  <meta name="description" content="Experience pixi's state machine and voice interaction demo in your browser.">
   
   <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -317,9 +317,9 @@
   <nav>
     <div class="container">
       <a href="index.html" class="back-link">
-        ← Back to About Saira
+        ← Back to About pixi
       </a>
-      <span class="brand-title">Saira Interaction Demo</span>
+      <span class="brand-title">pixi Interaction Demo</span>
     </div>
   </nav>
 
@@ -355,16 +355,16 @@
       <!-- Transcript Box -->
       <div id="chatBox" class="chat-box">
         <div class="chat-msg assistant">
-          <span class="msg-sender">SAIRA</span>
+          <span class="msg-sender">pixi</span>
           <div class="msg-bubble">
-            Hello! I am Saira, your local-first Windows assistant. Click the microphone button or type a prompt below to see my state machine in action.
+            Hello! I am pixi, your local-first Windows assistant. Click the microphone button or type a prompt below to see my state machine in action.
           </div>
         </div>
       </div>
 
       <!-- Text Input Form -->
       <form id="inputForm" class="input-form">
-        <input type="text" id="textInput" class="text-input" placeholder="Type a message to Saira..." autocomplete="off">
+        <input type="text" id="textInput" class="text-input" placeholder="Type a message to pixi..." autocomplete="off">
         <button type="submit" class="send-btn">Send</button>
       </form>
 
@@ -527,7 +527,7 @@
         
         const senderSpan = document.createElement('span');
         senderSpan.className = 'msg-sender';
-        senderSpan.textContent = sender === 'user' ? 'YOU' : 'SAIRA';
+        senderSpan.textContent = sender === 'user' ? 'YOU' : 'pixi';
 
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = 'msg-bubble';
@@ -549,9 +549,9 @@
           const q = query.toLowerCase();
 
           if (q.includes('architecture')) {
-            responseText = "Saira is built with Electron (Main Tray Process), React, TypeScript, and a Node.js orchestrator with pluggable STT/LLM/TTS stages.";
+            responseText = "pixi is built with Electron (Main Tray Process), React, TypeScript, and a Node.js orchestrator with pluggable STT/LLM/TTS stages.";
           } else if (q.includes('offline')) {
-            responseText = "Yes! Saira supports 100% offline local execution using faster-whisper, local Ollama models, and Windows SAPI5 / Piper TTS.";
+            responseText = "Yes! pixi supports 100% offline local execution using faster-whisper, local Ollama models, and Windows SAPI5 / Piper TTS.";
           } else if (q.includes('provider')) {
             responseText = "Supported providers include STT (OpenAI/Groq Whisper, local faster-whisper), LLM (GPT-4o-mini, Gemini, Groq Llama, Ollama), and TTS (Fish, ElevenLabs, Azure, SAPI5).";
           }
@@ -599,7 +599,7 @@
             // Fallback for browsers without speech recognition API
             updateState('listening');
             setTimeout(() => {
-              processQuery("Simulated voice input: Tell me about Saira's offline capabilities.");
+              processQuery("Simulated voice input: Tell me about pixi's offline capabilities.");
             }, 2000);
           }
         }

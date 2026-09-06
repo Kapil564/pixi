@@ -30,7 +30,7 @@ function getSettingsFilePath(): string {
 function getMachineSecretKey(): string {
   const user = os.userInfo?.()?.username || 'user';
   const host = os.hostname() || 'windows';
-  return `saira-secret:${user}@${host}`;
+  return `pixi-secret:${user}@${host}`;
 }
 
 function obfuscateFallback(plainText: string): string {
@@ -102,7 +102,7 @@ function decryptSecret(secret?: string): string | undefined {
 }
 
 /**
- * Reads user settings from %APPDATA%\Saira\settings.json and syncs with runtime config.
+ * Reads user settings from %APPDATA%\pixi\settings.json and syncs with runtime config.
  */
 export function getSettings(): UserSettings {
   const filePath = getSettingsFilePath();
@@ -135,7 +135,7 @@ export function getSettings(): UserSettings {
 }
 
 /**
- * Saves user settings to %APPDATA%\Saira\settings.json and syncs with runtime config.
+ * Saves user settings to %APPDATA%\pixi\settings.json and syncs with runtime config.
  */
 export function saveSettings(settings: Partial<UserSettings>): UserSettings {
   const current = getSettings();

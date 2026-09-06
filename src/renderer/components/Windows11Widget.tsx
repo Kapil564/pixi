@@ -44,7 +44,7 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
   const displayPrompt =
     transcription ||
     statusText ||
-    (isListening ? 'Saira is listening...' : isThinking ? 'Saira is processing...' : 'Ask Saira anything...');
+    (isListening ? 'pixi is listening...' : isThinking ? 'pixi is processing...' : 'Ask pixi anything...');
 
   return (
     <div className="w-full flex flex-col items-center select-none font-sans drag-region p-2">
@@ -56,7 +56,7 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
           <button
             onClick={onMicClick}
             className="relative w-11 h-11 rounded-xl bg-[#181825] border border-[#45475a] flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-md overflow-hidden"
-            title={isListening ? 'Click to stop listening' : 'Click to speak to Saira'}
+            title={isListening ? 'Click to stop listening' : 'Click to speak to pixi'}
           >
             <PixelBlobCharacter phase={phase} size={38} />
           </button>
@@ -134,7 +134,7 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
 
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-[#cdd6f4] tracking-tight leading-tight">
-                  Saira Response
+                  pixi Response
                 </span>
                 <span className="text-xs text-[#a6adc8] font-normal mt-0.5">
                   {responseMessage}

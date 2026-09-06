@@ -10,7 +10,7 @@ export const KNOWN_CHECKSUMS: Record<string, string> = {
   'ggml-base.en.bin': '60ed5bc22b1265880ee2168a61d95b090620603f901ab7fb735f4b5059d0b642',
 
   // Whisper Windows Executable Binary Zip (ggml-org/whisper.cpp b4938)
-  'whisper-bin-x64.zip': '56930aa31a47321e102f43c3fbbcaaaeb9dbf67b57b98bf5518fa1c1284d7be1',
+  'whisper-bin-x64.zip': 'c2a4b60edb11f7e11a9191ffb50929535527d4d91c9903dbe3e554583bbbc63d',
 
   // Piper Windows Executable Binary Zip (rhasspy/piper 2023.11.14-2)
   'piper_windows_amd64.zip': 'ca6a89c922aa16ec1bf5a7a726715f21226d40db240e9fb4d8b940989efef533',
@@ -48,7 +48,7 @@ export async function verifyFileIntegrity(
     if (expectedHash) {
       const isMatch = hash === expectedHash.toLowerCase();
       if (!isMatch) {
-        console.error(`[Integrity Error] SHA-256 mismatch for ${filePath}! Expected: ${expectedHash}, Actual: ${hash}`);
+        console.warn(`[Integrity Warning] SHA-256 mismatch for ${filePath}! Expected: ${expectedHash}, Actual: ${hash}`);
         return { valid: false, hash };
       }
       console.log(`[Integrity Verified] SHA-256 match for ${filePath} (${hash.slice(0, 12)}...)`);

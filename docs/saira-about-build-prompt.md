@@ -1,7 +1,7 @@
-# Build prompt: Saira — "about" landing page
+# Build prompt: pixi — "about" landing page
 
 Build a single self-contained HTML file (inline CSS + JS, no build step) that
-introduces **Saira**, a real product, to visitors. Below is everything needed:
+introduces **pixi**, a real product, to visitors. Below is everything needed:
 product context, design system, page structure, and a full component spec for
 the signature visual (a live-drawn pixel-art orb).
 
@@ -9,7 +9,7 @@ the signature visual (a live-drawn pixel-art orb).
 
 ## 1. Product context (use this verbatim for copy — don't invent facts beyond it)
 
-Saira is a **privacy-first, Siri-like desktop voice assistant for Windows**,
+pixi is a **privacy-first, Siri-like desktop voice assistant for Windows**,
 built with **Electron, React, TypeScript, and SQLite**.
 
 **The problem:**
@@ -27,7 +27,7 @@ built with **Electron, React, TypeScript, and SQLite**.
   - **TTS:** Fish Audio, ElevenLabs, Azure, Windows SAPI5 / Piper
   - All three stages support **100% offline** operation.
 - Dynamic continuous voice activity detection (VAD).
-- Long-term memory: per-user SQLite (`%APPDATA%\Saira\assistant.db`) +
+- Long-term memory: per-user SQLite (`%APPDATA%\pixi\assistant.db`) +
   Markdown memory files.
 - **Dual UI modes:** a Catppuccin-themed Windows 11 desktop widget, and a
   floating pixel-art mascot orb.
@@ -57,7 +57,7 @@ Node.js Orchestrator & Task Scheduler
 
 **Honesty constraints:** The Windows app is still in development. Don't
 invent download links, pricing, release dates, or benchmark numbers. The
-page should link to a separate interactive browser demo (`saira-bot.html`)
+page should link to a separate interactive browser demo (`pixi-bot.html`)
 that shows the same state machine, not a real download.
 
 ---
@@ -100,8 +100,8 @@ that shows the same state machine, not a real download.
 
 ## 3. Page structure (in order)
 
-1. **Nav** — wordmark "Saira" (italic Fraunces) + small mono "for Windows"
-   subtitle, and a pill link "Try the interaction demo" → `saira-bot.html`.
+1. **Nav** — wordmark "pixi" (italic Fraunces) + small mono "for Windows"
+   subtitle, and a pill link "Try the interaction demo" → `pixi-bot.html`.
 
 2. **Hero**
    - The **pixel-art orb** (see full spec in §4) centered above the headline,
@@ -114,10 +114,10 @@ that shows the same state machine, not a real download.
      "See how it's built" anchor-scroll link.
    - Small stack tags row: Electron / React / TypeScript / SQLite.
 
-3. **"Why Saira exists"** — two-column card split:
+3. **"Why pixi exists"** — two-column card split:
    - Left card ("The problem"): 3 bullets, each with a small ember dot
      marker, drawn from §1.
-   - Right card ("What Saira does instead"): 3 bullets, sage dot markers.
+   - Right card ("What pixi does instead"): 3 bullets, sage dot markers.
 
 4. **"Two ways to see her"** — dual UI modes:
    - Card 1: "Pixel-art mascot orb" — small live preview(s) of the orb
@@ -144,9 +144,9 @@ that shows the same state machine, not a real download.
 
 8. **Final CTA** — short, honest: app is still in development; the linked
    demo shows the interaction flow, not a finished product. One primary
-   button back to `saira-bot.html`.
+   button back to `pixi-bot.html`.
 
-9. **Footer** — one muted mono line: "Saira — Electron · React · TypeScript
+9. **Footer** — one muted mono line: "pixi — Electron · React · TypeScript
    · SQLite".
 
 Make the whole page responsive (stack to 1 column under ~760px), and respect
@@ -195,7 +195,7 @@ change.
 
 ## 5. Cross-page link
 
-Assume a second file, `saira-bot.html`, already exists: a working
+Assume a second file, `pixi-bot.html`, already exists: a working
 interactive demo with a mic button (Web Speech API), text-input fallback,
 and a transcript, driven by the same idle/listening/thinking/speaking state
 machine. All CTAs on this about page link to it — don't rebuild it here.

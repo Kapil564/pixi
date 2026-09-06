@@ -147,19 +147,19 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
 
   let modelDownloaded = false;
   try {
-    const res = await fetch(`${baseUrl}/api/tags`);
-    if (res.ok) {
-      const data = (await res.json()) as { models?: Array<{ name: string }> };
-      if (Array.isArray(data.models)) {
-        modelDownloaded = data.models.some((m) => {
-          const modelName = m.name.toLowerCase();
-          const expected = DEFAULT_LOCAL_MODEL.toLowerCase();
-          return modelName === expected || modelName.startsWith(expected + ':') || modelName.startsWith(expected + '-');
-        });
+    const showRes = await fetch(`${baseUrl}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: DEFAULT_LOCAL_MODEL }),
+    });
+    if (showRes.ok) {
+      const showData = (await showRes.json()) as { error?: string };
+      if (!showData.error) {
+        modelDownloaded = true;
       }
     }
   } catch (err) {
-    console.error('[Ollama Status Error] Failed to fetch tags:', err);
+    console.error('[Ollama Status Error] Failed to verify model availability via /api/show:', err);
   }
 
   let statusText = 'Ready';

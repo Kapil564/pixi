@@ -15,10 +15,10 @@ export class TTSRouter implements TTSProvider {
     private local: TTSProvider
   ) {}
 
-  async speak(text: string): Promise<void> {
+  async speak(text: string, onStart?: () => void): Promise<void> {
     if (this.primary) {
       try {
-        await this.primary.speak(text);
+        await this.primary.speak(text, onStart);
         logProviderUsage({
           turnPrompt: text,
           providerUsed: this.primary.name,
@@ -33,7 +33,7 @@ export class TTSRouter implements TTSProvider {
 
           // OS notification
           notifier.notify({
-            title: 'Saira Offline Voice',
+            title: 'pixi Offline Voice',
             message: 'API rate limit reached. Switched to offline voice for speech synthesis.',
             sound: false,
           });
@@ -47,7 +47,7 @@ export class TTSRouter implements TTSProvider {
             errorDetails: errMsg,
           });
 
-          return await this.local.speak(text);
+          return await this.local.speak(text, onStart);
         }
 
         // Rethrow non-quota errors (auth/network/401) so they surface properly
@@ -60,7 +60,7 @@ export class TTSRouter implements TTSProvider {
       providerUsed: 'local-piper',
       fallbackOccurred: false,
     });
-    return await this.local.speak(text);
+    return await this.local.speak(text, onStart);
   }
 
   stop(): void {

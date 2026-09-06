@@ -15,7 +15,7 @@ export interface MemoryFileContent {
 }
 
 export interface MemoryManifestItem {
-  relPath: string; // e.g. "profile.md", "preferences.md", "projects/saira.md"
+  relPath: string; // e.g. "profile.md", "preferences.md", "projects/pixi.md"
   absPath: string;
   category: string;
   description: string;
@@ -183,7 +183,7 @@ const STOP_WORDS = new Set([
   'should', 'so', 'some', 'such', 'than', 'that', 'the', 'their', 'theirs', 'them', 'themselves',
   'then', 'there', 'these', 'they', 'this', 'those', 'through', 'to', 'too', 'under', 'until',
   'up', 'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom',
-  'why', 'with', 'would', 'you', 'your', 'yours', 'yourself', 'yourselves', 'saira', 'assistant',
+  'why', 'with', 'would', 'you', 'your', 'yours', 'yourself', 'yourselves', 'pixi', 'assistant',
   'please', 'tell', 'show', 'remember', 'note', 'add', 'set', 'list'
 ]);
 
@@ -305,7 +305,7 @@ export function getRelevantMemories(userMessage: string): Array<{ relPath: strin
 export async function saveFactToMemory(params: {
   fact: string;
   category: string;
-  targetFile: string; // e.g. "profile.md", "preferences.md", "projects/saira.md"
+  targetFile: string; // e.g. "profile.md", "preferences.md", "projects/pixi.md"
   contradictionInfo?: { isContradiction: boolean; existingFactIndex?: number; updatedBulletText?: string };
 }): Promise<void> {
   const release = await memoryWriteMutex.acquire();

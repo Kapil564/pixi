@@ -75,6 +75,7 @@ export async function createOrchestrator(): Promise<Orchestrator> {
     const cancelActivePipeline = () => {
       activeRequestId++;
       tts.stop();
+      socket.emit('speaking_stop');
     };
 
     socket.on('stop_speech', () => {
@@ -95,7 +96,7 @@ export async function createOrchestrator(): Promise<Orchestrator> {
       const currentReqId = activeRequestId;
 
       try {
-        const debugPath = path.join(os.tmpdir(), 'saira_debug.wav');
+        const debugPath = path.join(os.tmpdir(), 'pixi_debug.wav');
         fs.writeFileSync(debugPath, audioBuffer);
         console.log(`[Audio Debug] Received ${audioBuffer.length} bytes. Saved to temp dir: ${debugPath}`);
 
@@ -169,14 +170,20 @@ export async function createOrchestrator(): Promise<Orchestrator> {
 
         if (response.spoken && response.spoken.trim()) {
           console.log('[TTS] Synthesizing speech...');
-          await tts.speak(response.spoken);
+          await tts.speak(response.spoken, () => {
+            if (currentReqId === activeRequestId) {
+              socket.emit('speaking_start');
+            }
+          });
           if (currentReqId === activeRequestId) {
             console.log('[TTS] Finished speaking.');
+            socket.emit('speaking_stop');
           } else {
             console.log('[TTS] Speech output was preempted by a newer request.');
           }
         } else {
           console.log('[TTS] Intent output is silent. Skipping TTS speech.');
+          socket.emit('speaking_stop');
         }
       } catch (err) {
         if (currentReqId !== activeRequestId) return;
@@ -250,20 +257,32 @@ export async function createOrchestrator(): Promise<Orchestrator> {
 
         if (response.spoken && response.spoken.trim()) {
           console.log('[TTS] Synthesizing speech...');
-          await tts.speak(response.spoken);
+          await tts.speak(response.spoken, () => {
+            if (currentReqId === activeRequestId) {
+              socket.emit('speaking_start');
+            }
+          });
           if (currentReqId === activeRequestId) {
             console.log('[TTS] Finished speaking.');
+            socket.emit('speaking_stop');
           } else {
             console.log('[TTS] Speech output was preempted by a newer request.');
           }
         } else {
           console.log('[TTS] Intent output is silent. Skipping TTS speech.');
+          socket.emit('speaking_stop');
         }
       } catch (err) {
-        if (currentReqId !== activeRequestId) return;
         const message = err instanceof Error ? err.message : String(err);
         console.error('[Pipeline Error]:', message);
-        await tts.speak('Sorry, something went wrong.');
+        socket.emit('response', { spoken: 'Sorry, something went wrong.', display: 'Sorry, something went wrong.' });
+        socket.emit('speaking_stop');
+        if (currentReqId === activeRequestId) {
+          await tts.speak('Sorry, something went wrong.', () => {
+            if (currentReqId === activeRequestId) socket.emit('speaking_start');
+          }).catch(() => {});
+          socket.emit('speaking_stop');
+        }
       }
     });
 
@@ -298,7 +317,7 @@ export async function createOrchestrator(): Promise<Orchestrator> {
       httpServer.listen(port, '127.0.0.1', () => {
         httpServer.removeListener('error', onError);
         config.server.port = port;
-        console.log(`Saira orchestrator listening on 127.0.0.1:${port}`);
+        console.log(`pixi orchestrator listening on 127.0.0.1:${port}`);
         resolve();
       });
     };

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Saira — Local-first Siri-like Voice Assistant for Windows</title>
-  <meta name="description" content="Saira is a privacy-first, Siri-like desktop voice assistant for Windows built with Electron, React, TypeScript, and SQLite. 100% offline capable.">
+  <title>pixi — Local-first Siri-like Voice Assistant for Windows</title>
+  <meta name="description" content="pixi is a privacy-first, Siri-like desktop voice assistant for Windows built with Electron, React, TypeScript, and SQLite. 100% offline capable.">
   
   <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -337,7 +337,7 @@
       margin-bottom: 1rem;
     }
 
-    /* Why Saira Exists */
+    /* Why pixi Exists */
     .bullet-list {
       list-style: none;
       display: flex;
@@ -627,11 +627,11 @@
   <!-- Navigation -->
   <nav>
     <div class="container">
-      <a href="#" class="brand" aria-label="Saira Homepage">
-        <span class="brand-title">Saira</span>
+      <a href="#" class="brand" aria-label="pixi Homepage">
+        <span class="brand-title">pixi</span>
         <span class="brand-subtitle">FOR WINDOWS</span>
       </a>
-      <a href="saira-bot.html" class="btn btn-secondary" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
+      <a href="pixi-bot.html" class="btn btn-secondary" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
         Try the interaction demo
       </a>
     </div>
@@ -644,7 +644,7 @@
         
         <div class="hero-orb-wrapper">
           <div class="orb-canvas-container">
-            <canvas id="heroOrbCanvas" class="orb-canvas" width="260" height="240" aria-label="Live animated pixel art orb mascot representing Saira's status"></canvas>
+            <canvas id="heroOrbCanvas" class="orb-canvas" width="260" height="240" aria-label="Live animated pixel art orb mascot representing pixi's status"></canvas>
           </div>
           <div id="heroStateBadge" class="state-badge">
             <span class="state-dot" id="heroStateDot"></span>
@@ -658,7 +658,7 @@
         </p>
 
         <div class="hero-actions">
-          <a href="saira-bot.html" class="btn btn-primary">Try the interaction demo</a>
+          <a href="pixi-bot.html" class="btn btn-primary">Try the interaction demo</a>
           <a href="#architecture" class="btn btn-secondary">See how it's built</a>
         </div>
 
@@ -672,11 +672,11 @@
       </div>
     </section>
 
-    <!-- Why Saira Exists -->
+    <!-- Why pixi Exists -->
     <section>
       <div class="container">
         <div class="eyebrow">THE MOTIVATION</div>
-        <h2>Why Saira exists</h2>
+        <h2>Why pixi exists</h2>
         
         <div class="card-grid">
           
@@ -699,9 +699,9 @@
             </ul>
           </div>
 
-          <!-- Right Card: What Saira Does Instead -->
+          <!-- Right Card: What pixi Does Instead -->
           <div class="card">
-            <h3 class="card-title">What Saira does instead</h3>
+            <h3 class="card-title">What pixi does instead</h3>
             <ul class="bullet-list">
               <li class="bullet-item">
                 <span class="bullet-dot sage"></span>
@@ -713,7 +713,7 @@
               </li>
               <li class="bullet-item">
                 <span class="bullet-dot sage"></span>
-                <span>Long-term memory stored locally in SQLite (<code>%APPDATA%\Saira\assistant.db</code>) and human-editable Markdown memory files.</span>
+                <span>Long-term memory stored locally in SQLite (<code>%APPDATA%\pixi\assistant.db</code>) and human-editable Markdown memory files.</span>
               </li>
             </ul>
           </div>
@@ -850,7 +850,7 @@
           <div class="fact-block">
             <h3 class="fact-title">Tray app, global hotkey & autostart</h3>
             <p class="fact-desc">
-              Runs quietly in the Windows System Tray. Press <code>Ctrl+Shift+Space</code> anywhere across the OS to summon Saira immediately. Configured to auto-start on boot via <code>openAtLogin</code>.
+              Runs quietly in the Windows System Tray. Press <code>Ctrl+Shift+Space</code> anywhere across the OS to summon pixi immediately. Configured to auto-start on boot via <code>openAtLogin</code>.
             </p>
           </div>
 
@@ -864,7 +864,7 @@
           <div class="fact-block">
             <h3 class="fact-title">Sleep, wake & unlock reminder checks</h3>
             <p class="fact-desc">
-              Monitors system sleep, wake, and screen-unlock events in real time to scan <code>%APPDATA%\Saira\assistant.db</code> and surface overdue reminders as soon as you unlock your device.
+              Monitors system sleep, wake, and screen-unlock events in real time to scan <code>%APPDATA%\pixi\assistant.db</code> and surface overdue reminders as soon as you unlock your device.
             </p>
           </div>
 
@@ -880,7 +880,7 @@
           <p>
             The native Windows desktop application is currently under active development. Experience the live state machine and speech flow right now in your browser.
           </p>
-          <a href="saira-bot.html" class="btn btn-primary">Launch Interactive Demo</a>
+          <a href="pixi-bot.html" class="btn btn-primary">Launch Interactive Demo</a>
         </div>
       </div>
     </section>
@@ -889,7 +889,7 @@
   <!-- Footer -->
   <footer>
     <div class="container">
-      <div class="footer-text">Saira — Electron · React · TypeScript · SQLite</div>
+      <div class="footer-text">pixi — Electron · React · TypeScript · SQLite</div>
     </div>
   </footer>
 
@@ -897,7 +897,7 @@
   <script>
     /**
      * Canvas Pixel-Art Orb Renderer
-     * Draws Saira's pixel art mascot dynamically on an HTML5 canvas element.
+     * Draws pixi's pixel art mascot dynamically on an HTML5 canvas element.
      * Grid size: ~26 x 24 logical pixels.
      */
     function createOrb(canvas, options = {}) {

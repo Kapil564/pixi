@@ -27,7 +27,7 @@ export const SetupBanner: React.FC<SetupBannerProps> = ({
 
           <div className="flex flex-col truncate">
             <span className="text-xs font-semibold tracking-tight text-[#cdd6f4]">
-              Setting Up Saira Offline Models
+              Setting Up pixi Offline Models
             </span>
             <span className="text-[11px] text-[#a6adc8] truncate leading-tight">
               {stepText}

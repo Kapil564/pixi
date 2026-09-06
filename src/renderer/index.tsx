@@ -89,7 +89,7 @@ function cleanupWorkletUrl() {
 }
 
 function App() {
-  const [messages, setMessages] = useState<{ from: 'user' | 'saira'; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ from: 'user' | 'pixi'; text: string }[]>([]);
   const [listening, setListening] = useState(false);
   const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
   const [status, setStatus] = useState<string>('');
@@ -174,7 +174,7 @@ function App() {
     scrollToBottom();
   }, [messages, status]);
 
-  const addMessage = (from: 'user' | 'saira', text: string) => {
+  const addMessage = (from: 'user' | 'pixi', text: string) => {
     setMessages((prev) => [...prev, { from, text }]);
   };
 
@@ -293,8 +293,8 @@ function App() {
       if (!isRecordingRef.current) return;
       if (hasSpokenRef.current) {
         const elapsedSilence = Date.now() - lastSpeechTimeRef.current;
-        if (elapsedSilence >= 4000) {
-          console.log('[Silence VAD] 4 seconds of silence detected after user speech. Auto-submitting audio to LLM...');
+        if (elapsedSilence >= 2000) {
+          console.log('[Silence VAD] 2 seconds of silence detected after user speech. Auto-submitting audio to LLM...');
           stopRecording();
         }
       }
@@ -348,7 +348,7 @@ function App() {
         processor.connect(audioCtx.destination);
       }
     } catch (err) {
-      addMessage('saira', 'Microphone access is required.');
+      addMessage('pixi', 'Microphone access is required.');
       setStatus('');
       setOrbPhase('idle');
       isRecordingRef.current = false;
@@ -407,7 +407,7 @@ function App() {
     if (assistant?.sendAudio) {
       assistant.sendAudio(wavBuffer);
     } else {
-      addMessage('saira', 'Error: Assistant bridge is not connected.');
+      addMessage('pixi', 'Error: Assistant bridge is not connected.');
       setStatus('');
       setOrbPhase('idle');
       restartVoiceListener();
@@ -446,11 +446,11 @@ function App() {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0]?.transcript?.toLowerCase() || '';
             if (
-              transcript.includes('saira') ||
-              transcript.includes('hey saira') ||
-              transcript.includes('hi saira') ||
-              transcript.includes('ok saira') ||
-              transcript.includes('wake up saira')
+              transcript.includes('pixi') ||
+              transcript.includes('hey pixi') ||
+              transcript.includes('hi pixi') ||
+              transcript.includes('ok pixi') ||
+              transcript.includes('wake up pixi')
             ) {
               console.log('[Wake Word Detected]:', transcript);
               startRecording();
@@ -479,7 +479,7 @@ function App() {
 
         recognition.start();
         recognitionRef.current = recognition;
-        console.log('[Wake Word] Listening for "Hey Saira"...');
+        console.log('[Wake Word] Listening for "Hey pixi"...');
       } catch (err) {
         startLocalAudioVad();
       }
@@ -509,7 +509,7 @@ function App() {
     if (assistant?.sendText) {
       assistant.sendText(text);
     } else {
-      addMessage('saira', 'Error: Assistant bridge is not connected.');
+      addMessage('pixi', 'Error: Assistant bridge is not connected.');
       setStatus('');
       setOrbPhase('idle');
       restartVoiceListener();
@@ -554,22 +554,27 @@ function App() {
     if (offTranscript) cleanups.push(offTranscript);
 
     const offResponse = assistant.onResponse?.((response: { spoken?: string; display?: string }) => {
-      addMessage('saira', response.display || response.spoken || 'Done.');
+      addMessage('pixi', response.display || response.spoken || 'Done.');
       setStatus('');
-      if (response.spoken && response.spoken.trim()) {
-        setOrbPhase('speaking');
-        const wordCount = response.spoken.trim().split(/\s+/).length;
-        const durationMs = Math.max(2500, Math.min(15000, wordCount * 350 + 1000));
-        setTimeout(() => {
-          setOrbPhase('idle');
-          restartVoiceListener();
-        }, durationMs);
-      } else {
+      if (!response.spoken || !response.spoken.trim()) {
         setOrbPhase('idle');
         restartVoiceListener();
       }
     });
     if (offResponse) cleanups.push(offResponse);
+
+    const offSpeakingStart = assistant.onSpeakingStart?.(() => {
+      setOrbPhase('speaking');
+      setStatus('🔊 Speaking...');
+    });
+    if (offSpeakingStart) cleanups.push(offSpeakingStart);
+
+    const offSpeakingStop = assistant.onSpeakingStop?.(() => {
+      setOrbPhase('idle');
+      setStatus('');
+      restartVoiceListener();
+    });
+    if (offSpeakingStop) cleanups.push(offSpeakingStop);
 
     return () => {
       cleanups.forEach((fn) => fn());
@@ -597,7 +602,7 @@ function App() {
     }
   }, [viewMode]);
 
-  const lastSairaMsg = messages.filter((m) => m.from === 'saira').slice(-1)[0]?.text;
+  const lastpixiMsg = messages.filter((m) => m.from === 'pixi').slice(-1)[0]?.text;
   const lastUserMsg = messages.filter((m) => m.from === 'user').slice(-1)[0]?.text;
 
   return (
@@ -614,7 +619,7 @@ function App() {
             phase={orbPhase}
             transcription={lastUserMsg}
             statusText={status}
-            responseMessage={lastSairaMsg}
+            responseMessage={lastpixiMsg}
             onMicClick={toggleRecording}
             onSendText={handleSendText}
             onSwitchMode={toggleViewMode}

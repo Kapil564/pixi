@@ -70,7 +70,7 @@ export function archivePrunedMessages(sessionId: number, messagesToPrune: DbMess
   console.log(`[Archive] Saved ${messagesToPrune.length} pruned message(s) to ${archivePath}`);
 }
 
-const ROLLING_SUMMARIZE_SYSTEM_PROMPT = `You are a session summarizer for the voice assistant Saira.
+const ROLLING_SUMMARIZE_SYSTEM_PROMPT = `You are a session summarizer for the voice assistant pixi.
 Your task is to merge new conversation transcript excerpts into an existing running session summary.
 
 Instructions:

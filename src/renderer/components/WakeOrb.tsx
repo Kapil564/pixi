@@ -13,13 +13,13 @@ export const WakeOrb: React.FC<WakeOrbProps> = ({ phase, onClick, size = 100 }) 
   const getTitleText = () => {
     switch (phase) {
       case 'listening':
-        return 'Saira is Listening... (Click to stop)';
+        return 'pixi is Listening... (Click to stop)';
       case 'thinking':
-        return 'Saira is Processing...';
+        return 'pixi is Processing...';
       case 'speaking':
-        return 'Saira is Speaking...';
+        return 'pixi is Speaking...';
       default:
-        return 'Click to talk to Saira';
+        return 'Click to talk to pixi';
     }
   };
 

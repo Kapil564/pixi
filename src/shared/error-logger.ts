@@ -22,7 +22,7 @@ export function logErrorToFile(error: any, context = 'General'): void {
     // Ignore cwd write failures
   }
 
-  // 2. Write to %APPDATA%\Saira\err.txt
+  // 2. Write to %APPDATA%\pixi\err.txt
   try {
     ensureUserDataDirectories();
     const appDataErrPath = path.join(getAppPaths().userDataDir, 'err.txt');

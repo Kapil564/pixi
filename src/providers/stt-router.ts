@@ -34,7 +34,7 @@ export class STTRouter implements STTProvider {
 
           // Light OS notification
           notifier.notify({
-            title: 'Saira Offline STT',
+            title: 'pixi Offline STT',
             message: 'API rate limit reached. Switched to local Whisper for transcription.',
             sound: false,
           });

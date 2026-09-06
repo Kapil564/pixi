@@ -8,12 +8,12 @@ import { getAppPaths } from '../shared/paths';
 export interface ExtractedFact {
   fact: string;
   category: 'profile' | 'preferences' | 'routines' | 'projects' | 'people';
-  target_file: string; // e.g. "profile.md", "preferences.md", "routines.md", "projects/saira.md", "people/john.md"
+  target_file: string; // e.g. "profile.md", "preferences.md", "routines.md", "projects/pixi.md", "people/john.md"
   confidence: number;
 }
 
-const FACT_EXTRACTION_SYSTEM_PROMPT = `You are a long-term memory fact extractor for the voice assistant Saira.
-Your goal is to extract notable, long-term user facts from a conversation turn to persist in Saira's memory markdown files.
+const FACT_EXTRACTION_SYSTEM_PROMPT = `You are a long-term memory fact extractor for the voice assistant pixi.
+Your goal is to extract notable, long-term user facts from a conversation turn to persist in pixi's memory markdown files.
 
 Output Format:
 Return ONLY a valid JSON array of extracted fact objects with zero markdown formatting or extra text:
@@ -35,7 +35,7 @@ Strict Rules for Extraction:
    - Specific project notes -> "projects/<project-name>.md"
    - Information about specific people -> "people/<person-name>.md"
 3. STRICT SENSITIVITY FILTER:
-   - EXCLUDE health, medical, financial, credit card, password, bank, or relationship details UNLESS the user explicitly and directly instructs Saira to remember/note it down (e.g., "Remember that I'm allergic to peanuts", "Keep in mind my wife's name is Sarah").
+   - EXCLUDE health, medical, financial, credit card, password, bank, or relationship details UNLESS the user explicitly and directly instructs pixi to remember/note it down (e.g., "Remember that I'm allergic to peanuts", "Keep in mind my wife's name is Sarah").
    - Never extract casual or implicit health/financial mentions.
 4. CONFIDENCE THRESHOLD: Only extract facts with high confidence (>= 0.75).
 5. If no noteworthy facts are present in the turn, return an empty JSON array: []`;
@@ -58,14 +58,17 @@ function safeJsonParse<T>(raw: string): T | null {
   if (!raw || !raw.trim()) return null;
   const cleaned = raw.replace(/```json|```/g, '').trim();
 
+  const stripComments = (s: string) => s.replace(/(^|[^\\])#.*$/gm, '$1').replace(/(^|[^\\])\/\/.*$/gm, '$1');
+  const decommented = stripComments(cleaned);
+
   try {
-    return JSON.parse(cleaned) as T;
+    return JSON.parse(decommented) as T;
   } catch {
     // Try extracting JSON array [...] or object {...} using regex
-    const jsonMatch = cleaned.match(/\[[\s\S]*\]/) || cleaned.match(/\{[\s\S]*\}/);
+    const jsonMatch = decommented.match(/\[[\s\S]*\]/) || decommented.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
-        return JSON.parse(jsonMatch[0]) as T;
+        return JSON.parse(stripComments(jsonMatch[0])) as T;
       } catch (err) {
         console.warn('[Fact Extractor JSON Warning] Substring JSON parse failed:', err);
       }

@@ -1,6 +1,6 @@
 # Problems Faced & Resolutions
 
-This document logs technical challenges, root causes, and resolutions encountered during the setup and development of **Saira Assistant**.
+This document logs technical challenges, root causes, and resolutions encountered during the setup and development of **pixi Assistant**.
 
 ---
 
@@ -15,7 +15,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 ## 2. Main Process Entry Point Path Mismatch
 
 - **Symptom**: `Cannot find module .../dist/main/index.js. Please verify that package.json has a valid "main" entry.`
-- **Root Cause**: [package.json](file:///c:/Users/kapil/Desktop/space/saira-assistant/package.json) specified `"main": "dist/main/index.js"`, but [tsup.config.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/tsup.config.ts) was configured with entry `main: './src/main/index.ts'`, which emitted `dist/main.js`.
+- **Root Cause**: [package.json](file:///c:/Users/kapil/Desktop/space/pixi-assistant/package.json) specified `"main": "dist/main/index.js"`, but [tsup.config.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/tsup.config.ts) was configured with entry `main: './src/main/index.ts'`, which emitted `dist/main.js`.
 - **Resolution**: Changed entry key in `tsup.config.ts` to `'main/index': './src/main/index.ts'`, building directly to `dist/main/index.js`.
 
 ---
@@ -36,13 +36,13 @@ This document logs technical challenges, root causes, and resolutions encountere
 - **Root Cause**: `src/main/index.ts` attempted `new Tray('.../assets/icon.png')`, but the `assets/` folder did not exist.
 - **Resolution**:
   1. Generated an app icon PNG and created `assets/icon.png`.
-  2. Updated [src/main/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/main/index.ts) with `getAppIcon()` helper using `nativeImage.createFromPath()` and `nativeImage.createEmpty()` fallback.
+  2. Updated [src/main/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/main/index.ts) with `getAppIcon()` helper using `nativeImage.createFromPath()` and `nativeImage.createEmpty()` fallback.
 
 ---
 
 ## 5. Blank Window (`ReferenceError: require is not defined`)
 
-- **Symptom**: Saira desktop window rendered a blank dark blue screen.
+- **Symptom**: pixi desktop window rendered a blank dark blue screen.
 - **Root Cause**: `tsup.config.ts` bundled `src/renderer/index.tsx` using `platform: 'node'`. In Electron browser context (`nodeIntegration: false`), `require()` does not exist, causing Chromium to throw `Uncaught ReferenceError: require is not defined`.
 - **Resolution**: Split `tsup.config.ts` into a dual configuration array:
   - Node target (`cjs`, `platform: 'node'`) for main, preload, and db scripts.
@@ -54,7 +54,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: Orchestrator pipeline stalled indefinitely at `[TTS] Synthesizing speech...`.
 - **Root Cause**: `playAudioBuffer` in `src/providers/tts.ts` used PowerShell's `System.Speech.SoundPlayer`, which **only supports raw `.wav` audio**. MP3 audio returned by ElevenLabs or Azure TTS caused PowerShell to hang or throw header errors.
-- **Resolution**: Replaced `SoundPlayer` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts) with Windows Media Player COM object (`WMPlayer.OCX`), which natively streams and plays MP3 audio files synchronously without freezing.
+- **Resolution**: Replaced `SoundPlayer` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts) with Windows Media Player COM object (`WMPlayer.OCX`), which natively streams and plays MP3 audio files synchronously without freezing.
 
 ---
 
@@ -70,7 +70,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: `TypeError: content.replace is not a function` during LLM intent parsing step.
 - **Root Cause**: Cloudflare Workers AI (or structured JSON model outputs) returned `content` as a pre-parsed JavaScript object instead of a raw string. Attempting `.replace()` on a non-string object threw a TypeError.
-- **Resolution**: Added `parseContentToIntent` helper in [src/providers/llm.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/llm.ts#L32-L46) that safely handles pre-parsed objects, strings with markdown code blocks, and fallback JSON formatting.
+- **Resolution**: Added `parseContentToIntent` helper in [src/providers/llm.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/llm.ts#L32-L46) that safely handles pre-parsed objects, strings with markdown code blocks, and fallback JSON formatting.
 
 ---
 
@@ -78,7 +78,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: `Cloudflare ElevenLabs TTS failed: Bad Request (UnhandledPromiseRejectionWarning)`.
 - **Root Cause**: Cloudflare Workers AI model parameters differ across account tiers/models. Uncaught network/API errors threw unhandled promise rejections that stalled the process.
-- **Resolution**: Enhanced `CloudflareElevenLabsTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts#L128-L168) with error detail logging and an **automatic fallback to Windows SAPI5 system TTS** so speech synthesis never crashes.
+- **Resolution**: Enhanced `CloudflareElevenLabsTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts#L128-L168) with error detail logging and an **automatic fallback to Windows SAPI5 system TTS** so speech synthesis never crashes.
 
 ---
 
@@ -86,7 +86,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: Cloudflare returned `code: 7000, message: "No route for that URI"` when requesting `elevenlabs/eleven-multilingual-v2` via standard Workers AI run endpoint.
 - **Root Cause**: `elevenlabs/eleven-multilingual-v2` is an AI Gateway proxy route, not a direct Workers AI model. Native Cloudflare Workers AI text-to-speech models use `@cf/myshell/melotts-english` or `@cf/deepgram/aura-1`.
-- **Resolution**: Updated default Cloudflare TTS model in [src/shared/config.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/shared/config.ts#L29) to `@cf/myshell/melotts-english`. Updated `CloudflareElevenLabsTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts#L128-L200) to support both native `@cf/` models and AI Gateway proxy routes.
+- **Resolution**: Updated default Cloudflare TTS model in [src/shared/config.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/shared/config.ts#L29) to `@cf/myshell/melotts-english`. Updated `CloudflareElevenLabsTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts#L128-L200) to support both native `@cf/` models and AI Gateway proxy routes.
 
 ---
 
@@ -94,7 +94,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: STT consistently transcribed spoken sentences as just `"you"` or `"You."`.
 - **Root Cause**: `MediaRecorder` captured Opus compressed audio (`audio/webm`), but `index.tsx` wrapped the Blob header as `audio/wav`. When Whisper attempted to parse a corrupt container header, it assumed silence, causing Whisper's default silence hallucination `"you"`.
-- **Resolution**: Updated `src/renderer/index.tsx` to preserve `audio/webm;codecs=opus` container headers and updated `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/stt.ts#L140-L155) to stream raw binary octet-streams to `@cf/openai/whisper`.
+- **Resolution**: Updated `src/renderer/index.tsx` to preserve `audio/webm;codecs=opus` container headers and updated `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/stt.ts#L140-L155) to stream raw binary octet-streams to `@cf/openai/whisper`.
 
 ---
 
@@ -102,7 +102,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: `Cloudflare AI Gateway STT failed (400): {"code":2001,"message":"Invalid request path. Expected path prefix /v1/:accountTag/:gatewayId"}`.
 - **Root Cause**: Cloudflare AI Gateway does not proxy OpenAI `/v1/audio/transcriptions` binary audio uploads without custom stored OpenAI provider keys.
-- **Resolution**: Refactored `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/stt.ts#L103-L135) to always stream binary audio directly to Cloudflare Workers AI (`/client/v4/accounts/:id/ai/run/@cf/openai/whisper`), bypassing AI Gateway proxy paths for STT.
+- **Resolution**: Refactored `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/stt.ts#L103-L135) to always stream binary audio directly to Cloudflare Workers AI (`/client/v4/accounts/:id/ai/run/@cf/openai/whisper`), bypassing AI Gateway proxy paths for STT.
 
 ---
 
@@ -111,7 +111,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 - **Symptom**: `Cloudflare Workers AI STT failed (401): {"result":null,"success":false,"errors":[{"code":10000,"message":"Authentication error"}],"messages":[]}`.
 - **Root Cause**: `CLOUDFLARE_API_TOKEN` in `.env` was either invalid, expired, lacked the required `Workers AI - Read` / `Workers AI - Edit` permission, or was set to a Cloudflare Global API Key (which cannot be authenticated via standard Bearer tokens).
 - **Resolution**:
-  1. Enhanced `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/stt.ts#L103-L192) to catch authentication and network errors, logging clear diagnostic instructions.
+  1. Enhanced `CloudflareSTT` in [src/providers/stt.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/stt.ts#L103-L192) to catch authentication and network errors, logging clear diagnostic instructions.
   2. Implemented a STT provider fallback chain (`Groq` -> `OpenAI` -> `Offline Whisper`) so transcription continues without crashing the app when Cloudflare authentication fails.
 
 ---
@@ -127,9 +127,9 @@ This document logs technical challenges, root causes, and resolutions encountere
   2. **No Request Cancellation Signal**: AI provider HTTP calls lacked an `AbortController` signal to terminate pending web API requests upon interruption.
   3. **No TTS Preemption Mechanism**: TTS playback subprocesses (PowerShell / Windows Media Player) ran to completion without an active kill/stop trigger.
 - **Resolution**:
-  1. **Monotonic Request ID Tracking**: Maintained an `activeRequestId` counter in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/orchestrator/index.ts). Each new user input increments `activeRequestId`. Before emitting socket events (`transcript`, `intent`, `response`) or triggering TTS, the orchestrator checks `if (currentReqId !== activeRequestId) return;` to silently discard stale responses.
+  1. **Monotonic Request ID Tracking**: Maintained an `activeRequestId` counter in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/orchestrator/index.ts). Each new user input increments `activeRequestId`. Before emitting socket events (`transcript`, `intent`, `response`) or triggering TTS, the orchestrator checks `if (currentReqId !== activeRequestId) return;` to silently discard stale responses.
   2. **AbortController Request Signals**: Created and passed an `AbortSignal` for each active request so that pending STT and LLM HTTP requests are immediately aborted when a new user input arrives.
-  3. **TTS Preemption & Audio Halting**: Added a `stop()` method to `TTSProvider` ([src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts)) to terminate ongoing PowerShell audio synthesis and playback processes instantly upon interruption.
+  3. **TTS Preemption & Audio Halting**: Added a `stop()` method to `TTSProvider` ([src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts)) to terminate ongoing PowerShell audio synthesis and playback processes instantly upon interruption.
 
 ---
 
@@ -140,9 +140,9 @@ This document logs technical challenges, root causes, and resolutions encountere
   - Renderer did not send an IPC signal to stop TTS at the onset of user speech detection (microphone click, wake word recognition, or VAD volume threshold).
   - TTS provider queue did not enforce strict single-threaded preemption upon speech start.
 - **Resolution**:
-  1. **Exposed IPC Interruption Bridge**: Exposed `stopSpeech()` in [src/main/preload.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/main/preload.ts) and added `stop-speech` handler in [src/main/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/main/index.ts) to forward `stop_speech` socket events instantly.
-  2. **Immediate Renderer Barge-In**: Updated `startRecording`, `handleSendText`, WebSpeech wake word, and offline VAD volume detection in [src/renderer/index.tsx](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/renderer/index.tsx) to invoke `assistant.stopSpeech()` immediately when user input or voice energy is detected.
-  3. **Strict Sequential TTS Execution**: Refactored `QueuedTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts) and pipeline handlers in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/orchestrator/index.ts) to guarantee zero parallel processing and instant audio playback termination upon interruption.
+  1. **Exposed IPC Interruption Bridge**: Exposed `stopSpeech()` in [src/main/preload.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/main/preload.ts) and added `stop-speech` handler in [src/main/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/main/index.ts) to forward `stop_speech` socket events instantly.
+  2. **Immediate Renderer Barge-In**: Updated `startRecording`, `handleSendText`, WebSpeech wake word, and offline VAD volume detection in [src/renderer/index.tsx](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/renderer/index.tsx) to invoke `assistant.stopSpeech()` immediately when user input or voice energy is detected.
+  3. **Strict Sequential TTS Execution**: Refactored `QueuedTTS` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts) and pipeline handlers in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/orchestrator/index.ts) to guarantee zero parallel processing and instant audio playback termination upon interruption.
 
 ---
 
@@ -150,14 +150,14 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: Electron main process initialization threw `Error [ERR_REQUIRE_ESM]: require() of ES Module .../fish-audio/dist/cjs/index.js from .../dist/main/index.js not supported`.
 - **Root Cause**: `fish-audio` package is an ES Module package. Top-level static `import` statements in CommonJS-targeted builds resulted in synchronous `require("fish-audio")` calls on startup, which Node 20 blocks for ESM packages.
-- **Resolution**: Converted top-level static import of `FishAudioClient` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts) to dynamic asynchronous `await import('fish-audio')` inside `FishAudioTTS.speak()`. Main process bundling and app startup now complete without ESM module loader conflicts.
+- **Resolution**: Converted top-level static import of `FishAudioClient` in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts) to dynamic asynchronous `await import('fish-audio')` inside `FishAudioTTS.speak()`. Main process bundling and app startup now complete without ESM module loader conflicts.
 
 ---
 
 ## 17. Project Workspace Temporary Audio Clutter
 
 - **Symptom**: `recorded_debug.wav` and `temp_tts_*.mp3` files were being saved into the project workspace root folder.
-- **Root Cause**: Hardcoded `process.cwd()` paths in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/orchestrator/index.ts) and [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts).
+- **Root Cause**: Hardcoded `process.cwd()` paths in [src/orchestrator/index.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/orchestrator/index.ts) and [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts).
 - **Resolution**: Redirected all temporary recording buffers and MP3 playback files to system temp (`os.tmpdir()`), ensuring zero file clutter in the project root directory.
 
 ---
@@ -166,7 +166,7 @@ This document logs technical challenges, root causes, and resolutions encountere
 
 - **Symptom**: PowerShell spawned via `-Command` printed `The system cannot open the device or file specified` or failed variable resolution when evaluating `$synth`, `$text`, or `$player`.
 - **Root Cause**: Passing multi-line PowerShell scripts directly to `powershell.exe -Command` caused PowerShell to interpret variable identifiers starting with `$` as uninitialized environment variables (`$null`).
-- **Resolution**: Created `spawnPowerShellScript()` helper in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/saira-assistant/src/providers/tts.ts#L29-L35) to encode all PowerShell scripts into UTF-16LE Base64 strings passed via `-NoProfile -NonInteractive -EncodedCommand`. Scripts now execute cleanly with zero syntax or variable expansion errors.
+- **Resolution**: Created `spawnPowerShellScript()` helper in [src/providers/tts.ts](file:///c:/Users/kapil/Desktop/space/pixi-assistant/src/providers/tts.ts#L29-L35) to encode all PowerShell scripts into UTF-16LE Base64 strings passed via `-NoProfile -NonInteractive -EncodedCommand`. Scripts now execute cleanly with zero syntax or variable expansion errors.
 
 
 

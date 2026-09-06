@@ -1,5 +1,5 @@
 {
-  "name": "saira-assistant",
+  "name": "pixi-assistant",
   "version": "0.1.0",
   "description": "A Siri-like Windows voice assistant with pluggable STT/LLM/TTS providers",
   "main": "dist/main/index.js",

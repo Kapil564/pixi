@@ -1,6 +1,6 @@
-# Saira Memory & Data Storage Architecture
+# pixi Memory & Data Storage Architecture
 
-Saira Assistant implements a **100% local, multi-layered memory and session storage architecture**. All data remains strictly on the user's local machine—no cloud databases, vector embeddings, or external memory services are used.
+pixi Assistant implements a **100% local, multi-layered memory and session storage architecture**. All data remains strictly on the user's local machine—no cloud databases, vector embeddings, or external memory services are used.
 
 ---
 
@@ -71,7 +71,7 @@ The `messages` table functions as a high-speed, rolling buffer for recent turn h
 
 ## 2. Rolling Summary & Flat File Archiving (`archive/sessions/`)
 
-To prevent the SQLite database from growing unbounded while retaining total history, Saira uses a rolling summarization and gzip archiving worker (`src/memory/rolling-summary.ts`).
+To prevent the SQLite database from growing unbounded while retaining total history, pixi uses a rolling summarization and gzip archiving worker (`src/memory/rolling-summary.ts`).
 
 ### Trigger Conditions
 - Session hits message threshold (**>= 20 raw messages** in SQLite).
@@ -99,7 +99,7 @@ memory/
   ├── profile.md          # User identity, name, role (ALWAYS loaded into every context)
   ├── preferences.md      # Likes, dislikes, communication style
   ├── routines.md         # Recurring daily patterns & schedules
-  ├── projects/           # Project-specific context files (e.g. projects/saira.md)
+  ├── projects/           # Project-specific context files (e.g. projects/pixi.md)
   └── people/             # Information about specific individuals (e.g. people/john.md)
 ```
 
@@ -113,11 +113,11 @@ updated: 2026-08-11
 description: Identity facts about the user including name and core background
 ---
 - Name: Kapil
-- Assistant: Saira
+- Assistant: pixi
 ```
 
 ### In-Memory Manifest & Keyword Retrieval
-- **In-Memory Manifest**: Saira builds an in-memory index of all memory files (`relPath`, `category`, `description`, tokenized `keywords`). The manifest is refreshed on application startup and after any file write.
+- **In-Memory Manifest**: pixi builds an in-memory index of all memory files (`relPath`, `category`, `description`, tokenized `keywords`). The manifest is refreshed on application startup and after any file write.
 - **Retrieval Algorithm**:
   1. `profile.md` is **ALWAYS** loaded into every prompt context build (no exceptions).
   2. For all other memory files, non-stop-word keyword overlap is calculated between the current user prompt and file manifest metadata.
@@ -132,7 +132,7 @@ Fact extraction (`src/memory/fact-extractor.ts`) runs as an **asynchronous, non-
 ### Structured Extraction Rules
 1. **JSON Output**: Returns an array of objects: `{ fact, category, target_file, confidence }`.
 2. **Identity Prioritization**: Name, job title, and core identity facts are routed straight to `profile.md`.
-3. **Safety Exclusions**: Health, medical, financial, credit card, password, or relationship details are **STRICTLY EXCLUDED** unless the user explicitly commands Saira to remember/note them down.
+3. **Safety Exclusions**: Health, medical, financial, credit card, password, or relationship details are **STRICTLY EXCLUDED** unless the user explicitly commands pixi to remember/note them down.
 4. **Contradiction & In-Place Editing**: Before writing, the worker checks target file contents. If a new fact contradicts an existing bullet point (e.g., "vegetarian" vs "eats chicken now"), it edits the line in-place:
    ```markdown
    - Eats chicken now (previously: vegetarian)

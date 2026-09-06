@@ -12,7 +12,7 @@ export interface ProviderLogEntry {
 }
 
 /**
- * Logs turn provider usage and fallback events locally to %APPDATA%\Saira\provider_logs.jsonl.
+ * Logs turn provider usage and fallback events locally to %APPDATA%\pixi\provider_logs.jsonl.
  * Data is 100% private to the local machine and never transmitted remotely.
  */
 export function logProviderUsage(entry: Omit<ProviderLogEntry, 'timestamp'>): void {

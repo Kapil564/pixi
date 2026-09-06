@@ -1,9 +1,9 @@
-# Saira
+# pixi
 
 > A Siri-like native Windows voice assistant with 100% offline privacy mode, local & cloud AI providers, and long-term memory.
 
-![Release](https://img.shields.io/github/v/release/Kapil564/saira-assistant?style=flat-square&color=blue)
-![License](https://img.shields.io/github/license/Kapil564/saira-assistant?style=flat-square&color=green)
+![Release](https://img.shields.io/github/v/release/Kapil564/pixi-assistant?style=flat-square&color=blue)
+![License](https://img.shields.io/github/license/Kapil564/pixi-assistant?style=flat-square&color=green)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue?style=flat-square&logo=typescript)
 
@@ -11,14 +11,14 @@
 
 ## 📖 Description
 
-Most cloud voice assistants lock you into closed ecosystems, require persistent internet connectivity, and collect sensitive voice and personal telemetry. **Saira** solves this by delivering a privacy-first, highly extensible native Windows desktop voice assistant.
+Most cloud voice assistants lock you into closed ecosystems, require persistent internet connectivity, and collect sensitive voice and personal telemetry. **pixi** solves this by delivering a privacy-first, highly extensible native Windows desktop voice assistant.
 
-Whether you want **100% offline operation** using local models (Ollama, GGML Whisper, Piper ONNX) or ultra-fast cloud inference (OpenAI, Google Gemini, Groq, Fish Audio, ElevenLabs), Saira intelligently routes requests and gracefully falls back to local providers whenever APIs are unreachable or offline.
+Whether you want **100% offline operation** using local models (Ollama, GGML Whisper, Piper ONNX) or ultra-fast cloud inference (OpenAI, Google Gemini, Groq, Fish Audio, ElevenLabs), pixi intelligently routes requests and gracefully falls back to local providers whenever APIs are unreachable or offline.
 
 ### Key Capabilities
 - 🔒 **100% Offline Privacy Mode**: Runs completely on your PC with zero data leaving your machine.
-- 🎙️ **Hands-Free Wake Word & VAD**: Trigger Saira anytime by saying `"Hey Saira"` or using global hotkey `Ctrl+Shift+Space`.
-- 🧠 **Markdown Long-Term Memory**: Automatically extracts, updates, and indexes user preferences, routines, and identity into `%APPDATA%\Saira\memory\`.
+- 🎙️ **Hands-Free Wake Word & VAD**: Trigger pixi anytime by saying `"Hey pixi"` or using global hotkey `Ctrl+Shift+Space`.
+- 🧠 **Markdown Long-Term Memory**: Automatically extracts, updates, and indexes user preferences, routines, and identity into `%APPDATA%\pixi\memory\`.
 - ⚡ **Pluggable Provider Matrix**: Seamlessly switch between local Ollama / Whisper / Piper models and cloud API keys.
 - 🪟 **Windows Native Integration**: Native desktop notifications, taskbar tray controls, and widget bar overlay modes.
 - ⏰ **Automated Task Scheduling**: Create recurring reminders and to-do items powered by local SQLite storage.
@@ -58,8 +58,8 @@ Make sure your machine meets the following software & hardware requirements:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Kapil564/saira-assistant.git
-   cd saira-assistant
+   git clone https://github.com/Kapil564/pixi-assistant.git
+   cd pixi-assistant
    ```
 
 2. **Install project dependencies**:
@@ -78,7 +78,7 @@ Make sure your machine meets the following software & hardware requirements:
    pnpm db:migrate
    ```
 
-5. **Launch Saira in development mode**:
+5. **Launch pixi in development mode**:
    ```bash
    pnpm dev
    ```
@@ -87,13 +87,13 @@ Make sure your machine meets the following software & hardware requirements:
 
 ### Environment Variables
 
-Saira auto-selects active providers based on the keys available in your `.env` or saved in `%APPDATA%\Saira\settings.json`. If no cloud API keys are provided, Saira automatically defaults to **100% Offline Mode**.
+pixi auto-selects active providers based on the keys available in your `.env` or saved in `%APPDATA%\pixi\settings.json`. If no cloud API keys are provided, pixi automatically defaults to **100% Offline Mode**.
 
 Create or update your `.env` file with the keys you possess:
 
 ```env
 # ==============================================================================
-# SAIRA ASSISTANT CONFIGURATION
+# pixi ASSISTANT CONFIGURATION
 # ==============================================================================
 
 # Server & IPC Port Configuration
@@ -162,12 +162,12 @@ OLLAMA_BASE_URL=http://localhost:11434
   Executable installers and portable binaries will be generated inside `release/`.
 
 #### 2. User Controls & Keybindings
-- **Global Toggle Hotkey**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> anywhere in Windows to bring up Saira.
-- **Hands-Free Voice Activation**: Speak `"Hey Saira"` to activate voice listening.
+- **Global Toggle Hotkey**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> anywhere in Windows to bring up pixi.
+- **Hands-Free Voice Activation**: Speak `"Hey pixi"` to activate voice listening.
 - **Interface Switching**: Click the mode toggle button on the floating orb to switch between the **Pixel Blob Orb** and **Windows 11 Widget Bar**.
 
 #### 3. Voice Command Examples
-- *"Hey Saira, set a reminder to call Alex tomorrow at 3 PM."*
+- *"Hey pixi, set a reminder to call Alex tomorrow at 3 PM."*
 - *"Add buy coffee beans to my to-do list."*
 - *"Show my upcoming reminders."*
 - *"Remember that I prefer dark mode and short answers."*

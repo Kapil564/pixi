@@ -45,6 +45,16 @@ contextBridge.exposeInMainWorld('assistant', {
   offResponse: () => {
     ipcRenderer.removeAllListeners('response');
   },
+  onSpeakingStart: (cb: () => void) =>
+    safeOn('speaking-start', cb),
+  offSpeakingStart: () => {
+    ipcRenderer.removeAllListeners('speaking-start');
+  },
+  onSpeakingStop: (cb: () => void) =>
+    safeOn('speaking-stop', cb),
+  offSpeakingStop: () => {
+    ipcRenderer.removeAllListeners('speaking-stop');
+  },
   onWindowShown: (cb: () => void) =>
     safeOn('window-shown', cb),
   offWindowShown: () => {

@@ -22,7 +22,7 @@ export async function checkAndFireDueReminders(tts: TTSProvider): Promise<void> 
       console.log(`[Scheduler] Firing due reminder #${reminder.id}: "${reminder.text}"`);
 
       notifier.notify({
-        title: 'Saira Reminder',
+        title: 'pixi Reminder',
         message: reminder.text,
         sound: true,
       });

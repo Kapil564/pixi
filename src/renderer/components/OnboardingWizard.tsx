@@ -111,7 +111,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
               S
             </div>
             <div>
-              <h2 className="text-base font-bold tracking-tight text-[#cdd6f4]">Welcome to Saira</h2>
+              <h2 className="text-base font-bold tracking-tight text-[#cdd6f4]">Welcome to pixi</h2>
               <p className="text-xs text-[#a6adc8]">Step {step} of 4 — First Run Onboarding</p>
             </div>
           </div>
@@ -316,23 +316,23 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
             <div className="w-12 h-12 rounded-full bg-[#a6e3a1]/20 text-[#a6e3a1] flex items-center justify-center text-2xl mx-auto border border-[#a6e3a1]">
               ✓
             </div>
-            <h3 className="text-base font-bold text-[#cdd6f4]">Saira is Ready to Assist You!</h3>
+            <h3 className="text-base font-bold text-[#cdd6f4]">pixi is Ready to Assist You!</h3>
             <p className="text-xs text-[#a6adc8] max-w-md mx-auto leading-relaxed">
-              Your voice assistant models and offline configuration are complete. You can speak to Saira or trigger the assistant anytime.
+              Your voice assistant models and offline configuration are complete. You can speak to pixi or trigger the assistant anytime.
             </p>
 
             <div className="p-3 bg-[#181825] rounded-xl border border-[#313244] text-left text-xs space-y-1.5 text-[#cdd6f4] w-full box-border">
               <span className="font-bold text-[#89b4fa] block">Quick Shortcuts & Tips:</span>
               <div>• Global Hotkey: <code className="bg-[#313244] px-1.5 py-0.5 rounded text-[#a6e3a1]">Cmd/Ctrl + Shift + Space</code></div>
-              <div>• Wake Word: Speak <code className="bg-[#313244] px-1.5 py-0.5 rounded text-[#94e2d5]">"Hey Saira"</code> anytime</div>
-              <div>• System Tray: Right-click Saira icon in taskbar for autostart settings</div>
+              <div>• Wake Word: Speak <code className="bg-[#313244] px-1.5 py-0.5 rounded text-[#94e2d5]">"Hey pixi"</code> anytime</div>
+              <div>• System Tray: Right-click pixi icon in taskbar for autostart settings</div>
             </div>
 
             <button
               onClick={finishOnboarding}
               className="w-full py-3 rounded-xl bg-[#89b4fa] text-[#11111b] font-bold text-sm hover:bg-[#b4befe] transition-all shadow-md mt-2"
             >
-              Start Using Saira
+              Start Using pixi
             </button>
           </div>
         )}

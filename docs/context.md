@@ -1,24 +1,24 @@
-# Saira Assistant — Technical Architecture & System Context
+# pixi Assistant — Technical Architecture & System Context
 
-Welcome to the internal technical documentation for **Saira**, a privacy-first, Siri-like voice assistant for Windows built with Electron, TypeScript, SQLite, and pluggable STT/LLM/TTS providers.
+Welcome to the internal technical documentation for **pixi**, a privacy-first, Siri-like voice assistant for Windows built with Electron, TypeScript, SQLite, and pluggable STT/LLM/TTS providers.
 
 ---
 
 ## 1. System Overview
 
-Saira is designed to bridge the gap between cloud-based AI convenience and 100% offline, local-first privacy. It functions as a native Windows desktop assistant operating silently in the System Tray with frameless, transparent overlay windows.
+pixi is designed to bridge the gap between cloud-based AI convenience and 100% offline, local-first privacy. It functions as a native Windows desktop assistant operating silently in the System Tray with frameless, transparent overlay windows.
 
 ### Core Philosophy
-* **Zero Mandated Cloud Lock-in:** Saira operates out-of-the-box using local models (Ollama, local Whisper, and Windows SAPI5 / Piper TTS) without requiring any API keys.
-* **Smart Provider Fallback Matrix:** If API keys for cloud providers (OpenAI, Gemini, Groq, Fish Audio, ElevenLabs) are supplied in `.env`, Saira uses them. If an API key is missing or fails, Saira automatically falls back to local or free engines without crashing.
-* **Per-User Local Data Isolation:** Transcripts, reminders, to-dos, and long-term memory files stay strictly on disk inside `%APPDATA%\Saira\`. There is no central server, remote telemetry tracking, or cloud database synchronization.
+* **Zero Mandated Cloud Lock-in:** pixi operates out-of-the-box using local models (Ollama, local Whisper, and Windows SAPI5 / Piper TTS) without requiring any API keys.
+* **Smart Provider Fallback Matrix:** If API keys for cloud providers (OpenAI, Gemini, Groq, Fish Audio, ElevenLabs) are supplied in `.env`, pixi uses them. If an API key is missing or fails, pixi automatically falls back to local or free engines without crashing.
+* **Per-User Local Data Isolation:** Transcripts, reminders, to-dos, and long-term memory files stay strictly on disk inside `%APPDATA%\pixi\`. There is no central server, remote telemetry tracking, or cloud database synchronization.
 
 ---
 
 ## 2. Directory & Repository Structure
 
 ```
-saira-assistant/
+pixi-assistant/
 ├── .env                       # Local environment variables and API keys
 ├── .env.example               # Template environment configuration
 ├── drizzle.config.ts          # Drizzle ORM configuration for SQLite
@@ -45,7 +45,7 @@ saira-assistant/
     ├── memory/                # Context & Memory System
     │   ├── context-pipeline.ts # Assembles system prompts per turn (profile + memory + history)
     │   ├── fact-extractor.ts  # Async non-blocking LLM background fact extraction
-    │   ├── markdown-memory.ts # File-based Markdown memory manager (`%APPDATA%\Saira\memory\`)
+    │   ├── markdown-memory.ts # File-based Markdown memory manager (`%APPDATA%\pixi\memory\`)
     │   └── rolling-summary.ts # Periodic conversation summarizer & Gzip session archiver
     ├── orchestrator/          # Node.js Orchestrator Service
     │   ├── index.ts           # Socket.io server pipeline, VAD handler, request cancellation & lock logic
@@ -70,7 +70,7 @@ saira-assistant/
     └── shared/                # Cross-process shared utilities
         ├── config.ts          # Centralized configuration loader for `.env` and defaults
         ├── http-util.ts        # Shared HTTP request helper
-        ├── paths.ts           # OS path resolver (`%APPDATA%\Saira\` & asset locations)
+        ├── paths.ts           # OS path resolver (`%APPDATA%\pixi\` & asset locations)
         ├── provider-logger.ts # Provider activity logging
         └── types.ts           # Shared TypeScript interfaces & types
 ```
@@ -79,7 +79,7 @@ saira-assistant/
 
 ## 3. Services & Process Architecture
 
-Saira employs a decoupled two-tier desktop architecture connected via Socket.io IPC:
+pixi employs a decoupled two-tier desktop architecture connected via Socket.io IPC:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -111,7 +111,7 @@ Saira employs a decoupled two-tier desktop architecture connected via Socket.io 
 
 ## 4. Models, Pluggable Providers & Fallback Matrix
 
-Saira evaluates available environment variables at startup and dynamically routes requests through the best active provider.
+pixi evaluates available environment variables at startup and dynamically routes requests through the best active provider.
 
 ### Speech-to-Text (STT) Router
 1. **OpenAI Whisper API:** Selected if `STT_PROVIDER=openai` and `OPENAI_API_KEY` is present.
@@ -125,7 +125,7 @@ Saira evaluates available environment variables at startup and dynamically route
 ### Text-to-Speech (TTS) Router
 1. **Cloud Providers:** Routes to Fish Audio, ElevenLabs, or Azure Speech if corresponding API keys are set.
 2. **Local Piper TTS:** Selected if local `piper.exe` binary and voice model are downloaded.
-3. **Windows SAPI5 (Universal Fallback):** Executes native PowerShell `$sp.Speak()` commands using Windows built-in SAPI5 voices. Ensures Saira never breaks even without internet or cloud keys.
+3. **Windows SAPI5 (Universal Fallback):** Executes native PowerShell `$sp.Speak()` commands using Windows built-in SAPI5 voices. Ensures pixi never breaks even without internet or cloud keys.
 
 ---
 
@@ -136,7 +136,7 @@ Handling real-time voice interactions introduces significant race conditions:
 * Rapid back-to-back voice activations cause overlapping TTS audio output.
 * Long-running LLM inferences continue background writes after user cancels.
 
-### Saira's Interruption Solution:
+### pixi's Interruption Solution:
 
 1. **Request Request ID Guard (`activeRequestId`):**
    ```ts
@@ -154,7 +154,7 @@ Handling real-time voice interactions introduces significant race conditions:
 
 ## 6. Onboarding Flow & First-Run Setup
 
-Saira features an automated 3-step setup sequence managed by `setup-manager.ts` to ensure local offline models are ready:
+pixi features an automated 3-step setup sequence managed by `setup-manager.ts` to ensure local offline models are ready:
 
 ```
 [Application Startup]
@@ -183,7 +183,7 @@ Progress is logged non-blockingly and can be queried via IPC handle `setup:statu
    - Pressing `Cmd/Ctrl + Shift + Space` anywhere toggles window visibility and focuses input.
 3. **Voice Activity Detection (VAD):**
    - Offline local VAD monitors microphone volume spikes (warmup filtering + sustained vocal energy threshold).
-   - Alternatively, continuous Web Speech API listens for wake words (`"Hey Saira"`, `"Saira"`).
+   - Alternatively, continuous Web Speech API listens for wake words (`"Hey pixi"`, `"pixi"`).
    - Upon wake word detection, a wake chime plays, status updates to `🎙 Listening...`, and PCM audio recording starts.
    - 4 seconds of silence triggers automatic audio submission.
 4. **Mode Switching:**
@@ -193,20 +193,20 @@ Progress is logged non-blockingly and can be queried via IPC handle `setup:statu
 
 ## 8. Memory & Context System
 
-Saira maintains long-term memory across sessions using a hybrid SQLite + Markdown strategy stored strictly inside `%APPDATA%\Saira\`:
+pixi maintains long-term memory across sessions using a hybrid SQLite + Markdown strategy stored strictly inside `%APPDATA%\pixi\`:
 
 ### Local Filesystem Layout
-- **SQLite Database (`%APPDATA%\Saira\assistant.db`):** Stores structured tables for `sessions`, `messages`, `reminders`, and `todos`.
-- **Markdown Memory (`%APPDATA%\Saira\memory\`):**
+- **SQLite Database (`%APPDATA%\pixi\assistant.db`):** Stores structured tables for `sessions`, `messages`, `reminders`, and `todos`.
+- **Markdown Memory (`%APPDATA%\pixi\memory\`):**
   - `profile.md`: Core user bio, identity, and personal facts.
   - `preferences.md`: Communication preferences, themes, and habits.
   - `routines.md`: Recurring daily schedules and workflows.
   - `projects/`: Knowledge notes per user project.
   - `people/`: Important contacts and relationships.
-- **Session Archives (`%APPDATA%\Saira\archive\sessions\*.jsonl.gz`):** Gzip-compressed archives of past chat trajectories.
+- **Session Archives (`%APPDATA%\pixi\archive\sessions\*.jsonl.gz`):** Gzip-compressed archives of past chat trajectories.
 
 ### Per-Turn Context Pipeline
-For every user message, Saira assembles a turn context:
+For every user message, pixi assembles a turn context:
 1. Loads `profile.md`.
 2. Performs keyword matching against `preferences.md`, `routines.md`, `projects/`, and `people/`.
 3. Attaches the rolling summary of the active session.
@@ -248,4 +248,4 @@ pnpm build
 pnpm pack
 ```
 
-Output installers are generated in `release/` (`Saira Setup X.Y.Z.exe` and `Saira-X.Y.Z-portable.exe`).
+Output installers are generated in `release/` (`pixi Setup X.Y.Z.exe` and `pixi-X.Y.Z-portable.exe`).

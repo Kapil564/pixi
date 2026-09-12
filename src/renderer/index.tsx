@@ -645,14 +645,12 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const assistant = (window as any).assistant;
-    if (viewMode === 'widget' && assistant?.resizeToWidget) {
-      assistant.resizeToWidget();
-    } else if (assistant?.resizeToOrb) {
-      assistant.resizeToOrb();
-    }
-  }, [viewMode]);
+
+  // NOTE: Window resize is driven by two explicit sources only:
+  //   1. toggleViewMode() when the user switches modes interactively
+  //   2. The onboarding Promise.then() which resolves the correct startup size
+  // A standalone [viewMode] effect is intentionally absent to prevent a startup
+  // race condition where resizeToOrb() fires simultaneously with resizeToOnboarding().
 
   const lastpixiMsg = messages.filter((m) => m.from === 'pixi').slice(-1)[0]?.text;
   const lastUserMsg = messages.filter((m) => m.from === 'user').slice(-1)[0]?.text;
@@ -679,10 +677,11 @@ function App() {
         </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <WakeOrb
+        <WakeOrb
             phase={orbPhase}
             size={100}
             onClick={toggleRecording}
+            onSwitchMode={toggleViewMode}
           />
         </div>
       )}

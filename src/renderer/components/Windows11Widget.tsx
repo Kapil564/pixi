@@ -135,7 +135,7 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
                 <span className="text-sm font-semibold text-[#cdd6f4] tracking-tight leading-tight">
                   pixi Response
                 </span>
-                <span className="text-xs text-[#a6adc8] font-normal mt-0.5">
+                <span className="text-xs text-[#a6adc8] font-normal mt-0.5 whitespace-pre-wrap break-words max-h-20 overflow-y-auto block leading-relaxed">
                   {responseMessage}
                 </span>
               </div>

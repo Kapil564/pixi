@@ -269,8 +269,8 @@ ipcMain.on('hide-window', () => {
 
 ipcMain.on('resize-to-orb', () => {
   if (window) {
+    // Do NOT call positionTopLeft() here — preserve user's current window position
     window.setSize(100, 100, true);
-    positionTopLeft();
   }
 });
 
@@ -293,9 +293,10 @@ ipcMain.on('resize-to-panel', () => {
 ipcMain.on('resize-to-widget', () => {
   if (window) {
     window.setResizable(true);
-    window.setSize(640, 240, true);
+    // Increase height to 300 to avoid clipping response card + optional setup banner
+    // Do NOT call positionTopLeft() here — preserve user's current window position
+    window.setSize(640, 300, true);
     window.setResizable(false);
-    positionTopLeft();
   }
 });
 

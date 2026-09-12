@@ -80,7 +80,8 @@ export async function createOrchestrator(): Promise<Orchestrator> {
 
     socket.on('stop_speech', () => {
       console.log('[Orchestrator] Stop speech signal received from renderer.');
-      cancelActivePipeline();
+      tts.stop();
+      socket.emit('speaking_stop');
     });
 
     socket.on('audio', async (audioBuffer: Buffer) => {
@@ -120,7 +121,18 @@ export async function createOrchestrator(): Promise<Orchestrator> {
           };
           socket.emit('response', emptyResponse);
           if (tts) {
-            tts.speak(emptyResponse.spoken).catch(() => {});
+            try {
+              await tts.speak(emptyResponse.spoken, () => {
+                if (currentReqId === activeRequestId) {
+                  socket.emit('speaking_start');
+                }
+              });
+            } catch (err) {
+              console.warn('[TTS Warning on Empty Transcription]:', err);
+            }
+            if (currentReqId === activeRequestId) {
+              socket.emit('speaking_stop');
+            }
           }
           return;
         }
@@ -189,7 +201,19 @@ export async function createOrchestrator(): Promise<Orchestrator> {
         if (currentReqId !== activeRequestId) return;
         const message = err instanceof Error ? err.message : String(err);
         console.error('[Pipeline Error]:', message);
-        await tts.speak('Sorry, something went wrong.');
+        socket.emit('response', { spoken: 'Sorry, something went wrong.', display: 'Sorry, something went wrong.' });
+        if (tts) {
+          try {
+            await tts.speak('Sorry, something went wrong.', () => {
+              if (currentReqId === activeRequestId) {
+                socket.emit('speaking_start');
+              }
+            });
+          } catch {}
+          if (currentReqId === activeRequestId) {
+            socket.emit('speaking_stop');
+          }
+        }
       }
     });
 

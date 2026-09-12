@@ -2,8 +2,8 @@
 
 > A Siri-like native Windows voice assistant with 100% offline privacy mode, local & cloud AI providers, and long-term memory.
 
-![Release](https://img.shields.io/github/v/release/Kapil564/pixi-assistant?style=flat-square&color=blue)
-![License](https://img.shields.io/github/license/Kapil564/pixi-assistant?style=flat-square&color=green)
+![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue?style=flat-square&logo=typescript)
 
@@ -18,6 +18,8 @@ Whether you want **100% offline operation** using local models (Ollama, GGML Whi
 ### Key Capabilities
 - 🔒 **100% Offline Privacy Mode**: Runs completely on your PC with zero data leaving your machine.
 - 🎙️ **Hands-Free Wake Word & VAD**: Trigger pixi anytime by saying `"Hey pixi"` or using global hotkey `Ctrl+Shift+Space`.
+- 🛑 **Instant Voice Interruption (Barge-In)**: Speak or click anytime while pixi is talking to immediately halt TTS playback and start listening with zero overlap or audio feedback loops.
+- 🎨 **Pixel Blob Character & Win11 Widget UI**: Switch seamlessly between an animated Pixel Art Blob character and an acrylic Windows 11 floating widget bar styled with Catppuccin dark themes.
 - 🧠 **Markdown Long-Term Memory**: Automatically extracts, updates, and indexes user preferences, routines, and identity into `%APPDATA%\pixi\memory\`.
 - ⚡ **Pluggable Provider Matrix**: Seamlessly switch between local Ollama / Whisper / Piper models and cloud API keys.
 - 🪟 **Windows Native Integration**: Native desktop notifications, taskbar tray controls, and widget bar overlay modes.
@@ -50,7 +52,7 @@ Make sure your machine meets the following software & hardware requirements:
 - **Package Manager**: `pnpm` (`v9.x` or higher) — install via `npm i -g pnpm`
 - **Memory (RAM)**: 4 GB RAM minimum (8 GB recommended for local LLM inference)
 - **Disk Space**: ~3 GB free disk space (for local Whisper STT & Piper TTS model storage)
-- *(Optional)* **Ollama**: Required only for 100% local offline LLM inference ([Install Ollama](https://ollama.com))
+- **Ollama**: Required only for 100% local offline LLM inference ([Install Ollama](https://ollama.com))
 
 ---
 
@@ -58,8 +60,8 @@ Make sure your machine meets the following software & hardware requirements:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Kapil564/pixi-assistant.git
-   cd pixi-assistant
+   git clone https://github.com/Kapil564/pixi.git
+   cd pixi
    ```
 
 2. **Install project dependencies**:

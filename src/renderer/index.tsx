@@ -96,6 +96,11 @@ function App() {
   const [inputText, setInputText] = useState('');
   const [viewMode, setViewMode] = useState<'orb' | 'widget'>('orb');
   const [orbPhase, setOrbPhase] = useState<OrbPhase>('idle');
+  const orbPhaseRef = useRef<OrbPhase>('idle');
+  const updateOrbPhase = (phase: OrbPhase) => {
+    orbPhaseRef.current = phase;
+    setOrbPhase(phase);
+  };
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [setupState, setSetupState] = useState<{
     isComplete: boolean;
@@ -115,6 +120,7 @@ function App() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
+  const recordingStartTimeRef = useRef<number>(0);
   const vadStreamRef = useRef<MediaStream | null>(null);
   const vadAudioCtxRef = useRef<AudioContext | null>(null);
   const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -190,13 +196,19 @@ function App() {
   };
 
   const startLocalAudioVad = () => {
-    if (vadAudioCtxRef.current || isRecordingRef.current || !wakeWordEnabled) return;
+    if (vadAudioCtxRef.current || isRecordingRef.current || !wakeWordEnabled || orbPhaseRef.current !== 'idle') return;
 
     const startTime = Date.now();
-    const WARMUP_DURATION_MS = 1500;
+    const WARMUP_DURATION_MS = 1200;
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      if (isRecordingRef.current) {
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    }).then((stream) => {
+      if (isRecordingRef.current || orbPhaseRef.current !== 'idle') {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -211,29 +223,39 @@ function App() {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       let activeEnergyCount = 0;
+      let baselineSum = 0;
+      let baselineCount = 0;
+      let dynamicThreshold = 65;
 
       const checkVolume = () => {
-        if (!wakeWordEnabled || isRecordingRef.current || !vadAudioCtxRef.current) return;
+        if (!wakeWordEnabled || isRecordingRef.current || !vadAudioCtxRef.current || orbPhaseRef.current !== 'idle') return;
+
+        analyser.getByteFrequencyData(dataArray);
+
+        // Focus on speech frequency band (bins 4 to 32, roughly 125Hz to 2000Hz)
+        let sum = 0;
+        const startBin = 4;
+        const endBin = Math.min(32, dataArray.length);
+        for (let i = startBin; i < endBin; i++) {
+          sum += dataArray[i];
+        }
+        const speechBandVolume = sum / (endBin - startBin);
 
         if (Date.now() - startTime < WARMUP_DURATION_MS) {
+          baselineSum += speechBandVolume;
+          baselineCount++;
+          dynamicThreshold = Math.max(65, (baselineSum / Math.max(1, baselineCount)) + 28);
           requestAnimationFrame(checkVolume);
           return;
         }
 
-        analyser.getByteFrequencyData(dataArray);
-
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const averageVolume = sum / dataArray.length;
-
-        if (averageVolume > 55) {
+        if (speechBandVolume > dynamicThreshold) {
           activeEnergyCount++;
-          if (activeEnergyCount >= 8) {
-            console.log('[Offline VAD] Clear voice activity detected. Auto-triggering recording...');
-            startRecording();
+          // Require sustained voice energy (~300ms) rather than momentary click or tap
+          if (activeEnergyCount >= 18) {
+            console.log(`[Offline VAD] Clear voice activity detected (vol=${speechBandVolume.toFixed(1)} > ${dynamicThreshold.toFixed(1)}). Auto-triggering recording...`);
             activeEnergyCount = 0;
+            startRecording();
             return;
           }
         } else {
@@ -244,14 +266,14 @@ function App() {
       };
 
       checkVolume();
-      console.log('[Offline VAD] Listening for local voice activity...');
+      console.log('[Offline VAD] Listening for local voice activity (idle only)...');
     }).catch((err) => {
       console.warn('[Offline VAD Error]: Microphone access failed:', err);
     });
   };
 
   const restartVoiceListener = () => {
-    if (!wakeWordEnabled || isRecordingRef.current) return;
+    if (!wakeWordEnabled || isRecordingRef.current || orbPhaseRef.current !== 'idle') return;
 
     if (recognitionRef.current) {
       try { recognitionRef.current.start(); } catch {}
@@ -284,6 +306,7 @@ function App() {
 
     hasSpokenRef.current = false;
     lastSpeechTimeRef.current = Date.now();
+    recordingStartTimeRef.current = Date.now();
 
     if (silenceCheckIntervalRef.current) {
       clearInterval(silenceCheckIntervalRef.current);
@@ -297,20 +320,36 @@ function App() {
           console.log('[Silence VAD] 2 seconds of silence detected after user speech. Auto-submitting audio to LLM...');
           stopRecording();
         }
+      } else {
+        const elapsedRecording = Date.now() - recordingStartTimeRef.current;
+        if (elapsedRecording >= 10000) {
+          console.log('[Silence VAD] No speech detected after 10 seconds. Auto-stopping recording...');
+          stopRecording();
+        }
       }
     }, 200);
 
     const assistant = (window as any).assistant;
-    if (assistant?.stopSpeech) assistant.stopSpeech();
+    // Only interrupt TTS if assistant is currently speaking
+    if (orbPhaseRef.current === 'speaking' && assistant?.stopSpeech) {
+      assistant.stopSpeech();
+    }
     if (assistant?.showWindow) assistant.showWindow();
 
     playWakeChime();
-    setOrbPhase('listening');
+    updateOrbPhase('listening');
     setListening(true);
     setStatus('🎙 Listening...');
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000,
+        },
+      });
       mediaStreamRef.current = stream;
 
       const audioCtx = new AudioContext({ sampleRate: 16000 });
@@ -350,7 +389,7 @@ function App() {
     } catch (err) {
       addMessage('pixi', 'Microphone access is required.');
       setStatus('');
-      setOrbPhase('idle');
+      updateOrbPhase('idle');
       isRecordingRef.current = false;
       restartVoiceListener();
     }
@@ -359,6 +398,7 @@ function App() {
   const stopRecording = () => {
     if (!isRecordingRef.current) return;
     isRecordingRef.current = false;
+    stopVadListener();
 
     if (silenceCheckIntervalRef.current) {
       clearInterval(silenceCheckIntervalRef.current);
@@ -388,7 +428,7 @@ function App() {
     if (totalSamples === 0) {
       setListening(false);
       setStatus('');
-      setOrbPhase('idle');
+      updateOrbPhase('idle');
       restartVoiceListener();
       return;
     }
@@ -402,21 +442,21 @@ function App() {
 
     const wavBuffer = encodeWav(pcm, 16000);
     setStatus('⚡ Transcribing...');
-    setOrbPhase('thinking');
+    updateOrbPhase('thinking');
     const assistant = (window as any).assistant;
     if (assistant?.sendAudio) {
       assistant.sendAudio(wavBuffer);
     } else {
       addMessage('pixi', 'Error: Assistant bridge is not connected.');
       setStatus('');
-      setOrbPhase('idle');
+      updateOrbPhase('idle');
       restartVoiceListener();
     }
     setListening(false);
   };
 
   const toggleRecording = () => {
-    if (listening) stopRecording();
+    if (listening || isRecordingRef.current) stopRecording();
     else startRecording();
   };
 
@@ -461,7 +501,7 @@ function App() {
 
         recognition.onerror = (e: any) => {
           if (e.error === 'network' || e.error === 'no-speech' || e.error === 'aborted') {
-            if (e.error === 'network') {
+            if (e.error === 'network' && orbPhaseRef.current === 'idle') {
               startLocalAudioVad();
             }
             return;
@@ -470,9 +510,11 @@ function App() {
         };
 
         recognition.onend = () => {
-          if (wakeWordEnabled && !isRecordingRef.current) {
+          if (wakeWordEnabled && !isRecordingRef.current && orbPhaseRef.current === 'idle') {
             setTimeout(() => {
-              try { recognition.start(); } catch {}
+              if (wakeWordEnabled && !isRecordingRef.current && orbPhaseRef.current === 'idle') {
+                try { recognition.start(); } catch {}
+              }
             }, 1000);
           }
         };
@@ -481,10 +523,14 @@ function App() {
         recognitionRef.current = recognition;
         console.log('[Wake Word] Listening for "Hey pixi"...');
       } catch (err) {
-        startLocalAudioVad();
+        if (orbPhaseRef.current === 'idle') {
+          startLocalAudioVad();
+        }
       }
     } else {
-      startLocalAudioVad();
+      if (orbPhaseRef.current === 'idle') {
+        startLocalAudioVad();
+      }
     }
 
     return () => {
@@ -502,16 +548,18 @@ function App() {
 
     setInputText('');
     setStatus('🧠 Processing request...');
-    setOrbPhase('thinking');
+    updateOrbPhase('thinking');
 
     const assistant = (window as any).assistant;
-    if (assistant?.stopSpeech) assistant.stopSpeech();
+    if (orbPhaseRef.current === 'speaking' && assistant?.stopSpeech) {
+      assistant.stopSpeech();
+    }
     if (assistant?.sendText) {
       assistant.sendText(text);
     } else {
       addMessage('pixi', 'Error: Assistant bridge is not connected.');
       setStatus('');
-      setOrbPhase('idle');
+      updateOrbPhase('idle');
       restartVoiceListener();
     }
   };
@@ -544,35 +592,39 @@ function App() {
       if (data.text) {
         addMessage('user', data.text);
         setStatus('🧠 Thinking...');
-        setOrbPhase('thinking');
-      } else {
-        setStatus('');
-        setOrbPhase('idle');
-        restartVoiceListener();
+        updateOrbPhase('thinking');
       }
     });
     if (offTranscript) cleanups.push(offTranscript);
 
     const offResponse = assistant.onResponse?.((response: { spoken?: string; display?: string }) => {
       addMessage('pixi', response.display || response.spoken || 'Done.');
-      setStatus('');
       if (!response.spoken || !response.spoken.trim()) {
-        setOrbPhase('idle');
+        setStatus('');
+        updateOrbPhase('idle');
         restartVoiceListener();
+      } else {
+        setStatus('🔊 Speaking...');
       }
     });
     if (offResponse) cleanups.push(offResponse);
 
     const offSpeakingStart = assistant.onSpeakingStart?.(() => {
-      setOrbPhase('speaking');
+      stopVadListener();
+      updateOrbPhase('speaking');
       setStatus('🔊 Speaking...');
     });
     if (offSpeakingStart) cleanups.push(offSpeakingStart);
 
     const offSpeakingStop = assistant.onSpeakingStop?.(() => {
-      setOrbPhase('idle');
+      updateOrbPhase('idle');
       setStatus('');
-      restartVoiceListener();
+      // Enforce an 800ms acoustic grace period to allow room reflections of the speaker audio to dissipate
+      setTimeout(() => {
+        if (orbPhaseRef.current === 'idle' && !isRecordingRef.current) {
+          restartVoiceListener();
+        }
+      }, 800);
     });
     if (offSpeakingStop) cleanups.push(offSpeakingStop);
 
@@ -580,7 +632,7 @@ function App() {
       cleanups.forEach((fn) => fn());
       cleanupWorkletUrl();
     };
-  }, [viewMode]);
+  }, []);
 
   const toggleViewMode = () => {
     const nextMode = viewMode === 'orb' ? 'widget' : 'orb';
@@ -626,7 +678,7 @@ function App() {
           />
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-2">
+        <div className="w-full h-full flex items-center justify-center">
           <WakeOrb
             phase={orbPhase}
             size={100}

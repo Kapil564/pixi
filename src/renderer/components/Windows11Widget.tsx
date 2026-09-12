@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { OrbPhase } from './WakeOrb';
 import { PixelBlobCharacter } from './PixelBlobCharacter';
 
@@ -23,12 +23,11 @@ export const Windows11Widget: React.FC<Windows11WidgetProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [showResultCard, setShowResultCard] = useState(true);
-  const prevResponseRef = React.useRef(responseMessage);
-
-  if (responseMessage !== prevResponseRef.current) {
-    prevResponseRef.current = responseMessage;
-    if (responseMessage) setShowResultCard(true);
-  }
+  useEffect(() => {
+    if (responseMessage) {
+      setShowResultCard(true);
+    }
+  }, [responseMessage]);
 
   const isListening = phase === 'listening';
   const isThinking = phase === 'thinking';

@@ -3,1196 +3,984 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>pixi — Local-first Siri-like Voice Assistant for Windows</title>
-  <meta name="description" content="pixi is a privacy-first, Siri-like desktop voice assistant for Windows built with Electron, React, TypeScript, and SQLite. 100% offline capable.">
-  
-  <!-- Typography -->
+  <title>pixi — Your voice assistant for Windows, run locally</title>
+  <meta name="description" content="pixi is a privacy-first voice assistant for Windows. 100% offline capable, pluggable STT/LLM/TTS providers, long-term local memory, and a pixel blob that actually talks back.">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500..600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg: #0b0a08;
-      --bg-soft: #131210;
-      --bg-card: #16140f;
-      --rule: rgba(255, 255, 255, 0.09);
-      --text: #f3ede2;
-      --text-muted: #8f8878;
-      --gold: #d99a4e;
-      --gold-glow: rgba(217, 154, 78, 0.15);
-      --sage: #6fae8c;
-      --sage-glow: rgba(111, 174, 140, 0.15);
-      --silver: #c7ccd6;
-      --ember: #e2694a;
-      
-      --font-heading: 'Fraunces', Georgia, serif;
-      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-      --font-mono: 'IBM Plex Mono', monospace;
+      --bg: #0a0b0d;
+      --surface: #111318;
+      --surface-2: #161a20;
+      --border: #232830;
+      --border-soft: #1b1f26;
+      --text: #f2f3f5;
+      --muted: #9aa3af;
+      --dim: #6a7280;
+      --amber: #f0a84e;
+      --amber-deep: #b06a12;
+      --ink: #191208;
+      --emerald: #3ddc97;
+      --red: #f97066;
+      --sky: #7aa5e8;
+      --mono-bg: #0c0e11;
+      --mono-green: #a3e8b0;
+
+      --f-display: 'Space Grotesk', system-ui, sans-serif;
+      --f-body: 'Inter', system-ui, sans-serif;
+      --f-mono: 'JetBrains Mono', monospace;
     }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html {
-      scroll-behavior: smooth;
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--font-body);
-      font-size: 16px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
+    html { scroll-behavior: smooth; }
 
     body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--f-body);
+      font-size: 16px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
 
-    /* Container & Layout */
-    .container {
-      width: 100%;
-      max-width: 1040px;
-      margin: 0 auto;
-      padding: 0 1.5rem;
-    }
+    ::selection { background: rgba(240,168,78,0.28); }
 
-    section {
-      padding: 4.5rem 0;
-      border-bottom: 1px solid var(--rule);
-    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-    section:last-of-type {
-      border-bottom: none;
-    }
+    section { padding: 72px 0 40px; }
 
-    /* Typography Utilities */
-    .eyebrow {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 3px;
-      color: var(--text-muted);
-      margin-bottom: 0.75rem;
+    /* ── nav ─────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10,11,13,0.78);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .nav-inner {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 24px;
+      max-width: 1120px;
+      margin: 0 auto;
     }
-
-    .eyebrow::before {
-      content: '';
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: var(--gold);
+    .brand { display: flex; align-items: center; gap: 10px; font-family: var(--f-display); font-weight: 700; font-size: 1.2rem; letter-spacing: -0.01em; }
+    .brand .logo {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: var(--amber);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,0.15);
+      display: grid; place-items: center;
+      font-family: var(--f-mono); font-size: 11px; font-weight: 600; color: var(--ink);
     }
+    .nav-links { display: flex; align-items: center; gap: 6px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; padding: 8px 12px; border-radius: 10px; transition: color 0.15s, background 0.15s; }
+    .nav-links a:hover { color: var(--text); background: var(--surface-2); }
 
-    h1, h2, h3 {
-      font-family: var(--font-heading);
-      font-style: italic;
-      font-weight: 500;
-      line-height: 1.2;
-      color: var(--text);
-    }
-
-    h1 {
-      font-size: clamp(2.25rem, 5vw, 3.75rem);
-      letter-spacing: -0.02em;
-    }
-
-    h2 {
-      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
-      margin-bottom: 1.5rem;
-    }
-
-    p {
-      color: var(--text-muted);
-      font-size: 1.05rem;
-      line-height: 1.7;
-    }
-
-    code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--rule);
-      padding: 0.2em 0.4em;
-      border-radius: 4px;
-      color: var(--gold);
-    }
-
-    /* Buttons */
+    /* ── buttons ─────────────────────────────── */
     .btn {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1.75rem;
-      border-radius: 999px;
-      font-family: var(--font-body);
-      font-size: 0.95rem;
+      gap: 8px;
+      font-family: var(--f-body);
+      font-size: 0.92rem;
       font-weight: 600;
       text-decoration: none;
-      transition: all 0.25s ease;
-      cursor: pointer;
+      border-radius: 12px;
+      padding: 11px 20px;
       border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.16s ease;
+      white-space: nowrap;
     }
+    .btn svg { width: 16px; height: 16px; }
+    .btn-primary { background: var(--amber); color: var(--ink); box-shadow: 0 6px 20px -6px rgba(240,168,78,0.55); }
+    .btn-primary:hover { background: #f7b45e; transform: translateY(-1px); }
+    .btn-ghost { border-color: var(--border); color: var(--text); background: transparent; }
+    .btn-ghost:hover { border-color: var(--muted); transform: translateY(-1px); }
+    .btn-sm { padding: 8px 14px; font-size: 0.85rem; border-radius: 10px; }
+    .nav-actions { display: flex; gap: 10px; }
 
-    .btn-primary {
-      background-color: var(--gold);
-      color: var(--bg);
-      border-color: var(--gold);
-      box-shadow: 0 4px 20px var(--gold-glow);
-    }
-
-    .btn-primary:hover {
-      background-color: #e5a75c;
-      border-color: #e5a75c;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(217, 154, 78, 0.3);
-    }
-
-    .btn-secondary {
-      background-color: transparent;
-      color: var(--text);
-      border-color: var(--rule);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--gold);
-      color: var(--gold);
-      transform: translateY(-2px);
-      background: var(--gold-glow);
-    }
-
-    /* Navigation */
-    nav {
-      padding: 1.25rem 0;
-      border-bottom: 1px solid var(--rule);
-      background: rgba(11, 10, 8, 0.85);
-      backdrop-filter: blur(12px);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    nav .container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .brand {
-      display: flex;
-      align-items: baseline;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
-
-    .brand-title {
-      font-family: var(--font-heading);
-      font-style: italic;
-      font-size: 1.6rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .brand-subtitle {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 3px;
-      color: var(--text-muted);
-    }
-
-    /* Hero Section */
+    /* ── hero ────────────────────────────────── */
     .hero {
-      text-align: center;
-      padding: 4.5rem 0 5rem;
-    }
-
-    .hero-orb-wrapper {
-      display: flex;
-      flex-direction: column;
+      padding: 84px 0 64px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 48px;
       align-items: center;
-      justify-content: center;
-      margin-bottom: 2rem;
     }
+    @media (max-width: 900px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero-badge, .hero-chip-row { justify-content: center; } }
 
-    .orb-canvas-container {
-      position: relative;
-      width: 260px;
-      height: 240px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .orb-canvas {
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      width: 260px;
-      height: 240px;
-    }
-
-    .state-badge {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 3.5px;
-      padding: 0.35rem 1rem;
-      border-radius: 999px;
-      background: var(--bg-card);
-      border: 1px solid var(--rule);
-      margin-top: 1rem;
+    .hero-chip {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      transition: all 0.3s ease;
-    }
-
-    .state-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--gold);
-      box-shadow: 0 0 8px currentColor;
-    }
-
-    .hero-headline {
-      max-width: 800px;
-      margin: 0 auto 1.25rem;
-    }
-
-    .hero-subhead {
-      max-width: 640px;
-      margin: 0 auto 2rem;
-      font-size: 1.15rem;
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      margin-bottom: 2.5rem;
-      flex-wrap: wrap;
-    }
-
-    .hero-tags {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .chip {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      padding: 0.3rem 0.85rem;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--emerald);
+      border: 1px solid rgba(61,220,151,0.35);
+      background: rgba(61,220,151,0.08);
+      padding: 6px 12px;
       border-radius: 999px;
-      background: var(--bg-card);
-      border: 1px solid var(--rule);
-      color: var(--text-muted);
+    }
+    .hero-chip .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(61,220,151,0.5);} 50% { box-shadow: 0 0 0 6px rgba(61,220,151,0);} }
+
+    .hero h1 {
+      margin-top: 20px;
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: clamp(2.4rem, 5.5vw, 3.9rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .hero h1 .dim { color: var(--dim); }
+    .hero h1 .accent { color: var(--amber); }
+    .type-cursor {
+      display: inline-block;
+      color: var(--amber);
+      font-weight: 300;
+      margin-left: 3px;
+      animation: cursorBlink 0.85s steps(1) infinite;
+    }
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
-    .chip-offline {
-      border-color: rgba(111, 174, 140, 0.4);
-      color: var(--sage);
-      background: var(--sage-glow);
+    .hero-sub {
+      margin-top: 18px;
+      max-width: 560px;
+      font-size: 1.08rem;
+      color: var(--muted);
     }
 
-    /* Cards System */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 1.5rem;
+    .hero-cta { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; }
+
+    .hero-chip-row { display: flex; gap: 8px; margin-top: 34px; flex-wrap: wrap; }
+    .mini-chip {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 999px;
     }
 
-    .card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--rule);
+    /* orb card */
+    .orb-card {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background:
+        radial-gradient(120% 120% at 50% 0%, #1a1d24 0%, var(--surface) 55%, #101216 100%);
+      padding: 26px 26px 30px;
+      margin-bottom: 24px;
+      box-shadow: 0 24px 60px -30px rgba(0,0,0,0.8);
+    }
+    .orb-card .orb-frame {
+      aspect-ratio: 1;
+      max-width: 340px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 2rem;
-      transition: border-color 0.3s ease, transform 0.3s ease;
+      background: var(--mono-bg);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      position: relative;
     }
-
-    .card:hover {
-      border-color: rgba(255, 255, 255, 0.18);
+    .orb-card .orb-frame::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(rgba(255,255,255,0.03) 50%, transparent 50%);
+      background-size: 100% 4px;
+      opacity: 0.5;
+      pointer-events: none;
     }
+    canvas.orb { image-rendering: pixelated; width: 100%; height: auto; display: block; }
 
-    .card-title {
-      font-size: 1.35rem;
-      margin-bottom: 1rem;
-    }
+    .state-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+    .state-badge { display: inline-flex; align-items: center; gap: 9px; font-family: var(--f-mono); font-size: 0.8rem; color: var(--muted); }
+    .state-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+    .orb-card .foot { font-family: var(--f-mono); font-size: 0.72rem; color: var(--dim); display: flex; align-items: center; gap: 8px; }
+    .orb-caption { font-size: 0.78rem; color: var(--dim); margin-top: 4px; }
 
-    /* Why pixi Exists */
-    .bullet-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .bullet-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.85rem;
-      font-size: 0.98rem;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    .bullet-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-top: 0.5rem;
-      flex-shrink: 0;
-    }
-
-    .bullet-dot.ember {
-      background-color: var(--ember);
-      box-shadow: 0 0 10px rgba(226, 105, 74, 0.4);
-    }
-
-    .bullet-dot.sage {
-      background-color: var(--sage);
-      box-shadow: 0 0 10px rgba(111, 174, 140, 0.4);
-    }
-
-    /* Dual UI Modes */
-    .mascot-card-preview {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg-soft);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.25rem;
-      border: 1px solid var(--rule);
-    }
-
-    .widget-mockup {
-      background: #1e1e2e; /* Catppuccin Mocha base */
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    /* ── promo strip ─────────────────────────── */
+    .promo {
+      border: 1px solid rgba(240,168,78,0.45);
+      background: linear-gradient(180deg, rgba(240,168,78,0.08), rgba(240,168,78,0.02));
+      border-radius: 20px;
+      padding: 30px 34px 38px;
+      margin-bottom: 36px;
       position: relative;
       overflow: hidden;
     }
+    .promo::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--amber), var(--emerald));
+    }
+    .promo .kick { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; color: var(--emerald); text-transform: uppercase; }
+    .promo h2 {
+      margin-top: 10px;
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: clamp(1.4rem, 3.4vw, 2rem);
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .promo h2 .hl { color: var(--amber); }
+    .pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; }
+    .pipe-node {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 10px 16px;
+      text-align: center;
+    }
+    .pipe-node small { display: block; font-family: var(--f-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; color: var(--emerald); text-transform: uppercase; }
+    .pipe-node b { display: block; font-weight: 600; font-size: 0.96rem; margin-top: 2px; }
+    .pipe-arrow { color: var(--dim); }
+    .promo-note { margin-top: 18px; font-size: 0.95rem; color: var(--muted); }
+    .promo-note strong { color: var(--text); }
 
-    .mockup-header {
+    /* ── section heads ───────────────────────── */
+    .eyebrow { font-family: var(--f-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em; color: var(--amber); text-transform: uppercase; }
+    .section-title { margin-top: 10px; font-family: var(--f-display); font-weight: 700; font-size: clamp(1.7rem, 3.6vw, 2.4rem); letter-spacing: -0.02em; line-height: 1.15; }
+    .section-desc { margin-top: 14px; max-width: 640px; color: var(--muted); font-size: 1.02rem; }
+    .section-head { margin-bottom: 34px; }
+
+    /* ── cards & grids ───────────────────────── */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 24px; margin-bottom: 32px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 24px; margin-bottom: 32px; }
+    @media (max-width: 900px) { .grid2, .grid3 { grid-template-columns: 1fr; gap: 28px; margin-bottom: 32px; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px 26px 34px;
+      margin-bottom: 12px;
+    }
+    .card h3 { font-family: var(--f-display); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.01em; margin-bottom: 12px; }
+    .card h3 .accent { color: var(--amber); }
+    .card h3 .green { color: var(--emerald); }
+    .card h3 .red { color: var(--red); }
+    .card h3 .blue { color: var(--sky); }
+    .card p, .card li { color: var(--muted); font-size: 0.94rem; }
+    .card ul { list-style: none; }
+    .card li { padding-left: 22px; position: relative; margin-bottom: 10px; }
+    .card li::before { content: "›"; position: absolute; left: 6px; color: var(--amber); font-weight: 700; }
+    .card li strong { color: var(--text); }
+
+    code, .kbd {
+      font-family: var(--f-mono); font-size: 0.82em;
+      background: rgba(122,165,232,0.1); color: var(--sky);
+      padding: 2px 7px; border-radius: 6px;
+      border: 1px solid rgba(122,165,232,0.22);
+    }
+    .kbd { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+
+    /* ── terminal / mono panels ──────────────── */
+    .mono-panel {
+      font-family: var(--f-mono);
+      font-size: 0.84rem;
+      line-height: 1.8;
+      background: var(--mono-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 22px 26px;
+      margin-bottom: 12px;
+      color: var(--mono-green);
+      overflow-x: auto;
+    }
+    .mono-panel .prompt { color: var(--amber); }
+    .mono-panel .dim { color: #5f7063; }
+    .mono-panel .ok { color: var(--emerald); }
+    .mono-panel .warn { color: var(--red); }
+    .mono-panel .gold { color: var(--amber); }
+    .mono-panel .leaf { color: #d3d8e0; }
+    .mono-panel .box-c { color: var(--sky); }
+    .mono-panel .pipe-c { color: var(--amber); }
+    .cursor-blink { animation: blink 1s steps(1) infinite; color: var(--mono-green); }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .panel-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      gap: 12px;
+      margin-bottom: 12px;
     }
+    .panel-title { font-family: var(--f-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+    .panel-dots { display: flex; gap: 6px; }
+    .panel-dots i { width: 10px; height: 10px; border-radius: 50%; }
+    .card .note { margin-top: 14px; font-size: 0.85rem; color: var(--dim); }
+    .card .note strong { color: var(--text); }
 
-    .mockup-dots {
-      display: flex;
-      gap: 6px;
+    /* ── log (what was missing) ──────────────── */
+    .log-row {
+      display: flex; gap: 12px; align-items: baseline;
+      font-family: var(--f-mono); font-size: 0.88rem; color: var(--muted);
+      padding: 9px 0; border-bottom: 1px solid var(--border-soft);
     }
+    .log-row:last-child { border-bottom: none; }
+    .log-row .icon { font-family: var(--f-body); color: var(--red); }
+    .log-row.ok .icon { color: var(--emerald); }
+    .log-row.ok .path { color: var(--emerald); }
 
-    .mockup-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
+    /* ── spec sheet ──────────────────────────── */
+    .spec-row { display: grid; grid-template-columns: 52px 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border-soft); align-items: start; }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-ico {
+      width: 46px; height: 46px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface-2);
+      display: grid; place-items: center;
+      font-family: var(--f-mono); font-size: 0.66rem; font-weight: 600; color: var(--amber); text-align: center; line-height: 1.3;
     }
+    .spec-name { font-weight: 600; color: var(--text); font-size: 0.98rem; }
+    .spec-desc { color: var(--muted); font-size: 0.88rem; margin-top: 3px; }
 
-    .mockup-badge {
-      font-family: var(--font-mono);
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: var(--gold);
-      background: var(--gold-glow);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      border: 1px solid rgba(217, 154, 78, 0.3);
+    /* ── provider table ──────────────────────── */
+    .px { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+    .px th {
+      text-align: left; font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600;
+      padding: 12px 14px; background: var(--surface-2);
     }
+    .px th:first-child { border-top-left-radius: 12px; }
+    .px th:last-child { border-top-right-radius: 12px; }
+    .px td { padding: 13px 14px; border-top: 1px solid var(--border-soft); color: var(--text); }
+    .px .stage { color: var(--sky); font-family: var(--f-mono); font-size: 0.8rem; }
+    .px .offline { color: var(--emerald); font-weight: 600; }
+    .px .dim { color: var(--dim); }
 
-    .mockup-body {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-
-    .skeleton-line {
-      height: 8px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .skeleton-line.short { width: 40%; }
-    .skeleton-line.medium { width: 70%; }
-    .skeleton-line.accent { 
-      background: linear-gradient(90deg, var(--gold), var(--sage));
-      width: 85%;
-      height: 10px;
-    }
-
-    /* Architecture Section */
-    .arch-pre {
-      background-color: var(--bg-card);
-      border: 1px solid var(--rule);
-      border-radius: 18px;
-      padding: 2rem;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      line-height: 1.65;
-      overflow-x: auto;
-      color: var(--text-muted);
-      box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
-    }
-
-    .arch-pre .sage {
-      color: var(--sage);
-      font-weight: 500;
-    }
-
-    .arch-pre .gold {
-      color: var(--gold);
-      font-weight: 500;
-    }
-
-    .arch-pre .bright {
-      color: var(--text);
-    }
-
-    /* Providers Grid */
-    .provider-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .provider-card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--rule);
-      border-radius: 18px;
-      padding: 1.75rem;
-    }
-
-    .provider-card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 1.25rem;
-      color: var(--text);
-    }
-
-    .chip-cloud {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-    }
-
-    .provider-footnote {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--text-muted);
+    /* ── compact feature buttons ─────────────── */
+    .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    @media (max-width: 560px) { .feat-grid { grid-template-columns: 1fr; } }
+    .feat-btn {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-    }
-
-    .provider-footnote .indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: var(--sage);
-      box-shadow: 0 0 8px var(--sage);
-    }
-
-    /* Native Windows Fact Blocks */
-    .native-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 1.75rem;
-    }
-
-    .fact-block {
-      border-left: 2px solid rgba(217, 154, 78, 0.4);
-      padding-left: 1.5rem;
-      transition: border-color 0.3s ease;
-    }
-
-    .fact-block:hover {
-      border-left-color: var(--gold);
-    }
-
-    .fact-title {
-      font-size: 1.2rem;
-      margin-bottom: 0.4rem;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-family: var(--f-body);
+      font-size: 0.9rem;
+      font-weight: 600;
       color: var(--text);
+      transition: border-color 0.15s, transform 0.15s, background 0.15s;
     }
+    .feat-btn:hover { border-color: var(--amber); background: rgba(240,168,78,0.06); transform: translateY(-1px); }
+    .feat-btn .mark { width: 9px; height: 9px; flex: none; border-radius: 3px; background: var(--amber); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); }
+    .feat-btn .mark.green { background: var(--emerald); }
 
-    .fact-desc {
-      font-size: 1rem;
-      color: var(--text-muted);
+    /* ── compact provider buttons ────────────── */
+    .prov-stack { display: flex; flex-direction: column; gap: 18px; }
+    .prov-step .step-label {
+      font-family: var(--f-mono); font-size: 0.7rem; font-weight: 600;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--sky);
+      margin-bottom: 9px;
     }
+    .prov-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+    .prov-btn {
+      font-size: 0.8rem; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--muted); padding: 7px 14px; border-radius: 999px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .prov-btn:hover { border-color: var(--sky); color: var(--text); }
+    .prov-btn.local {
+      border-color: rgba(61,220,151,0.45);
+      color: var(--emerald);
+      background: rgba(61,220,151,0.07);
+    }
+    .prov-btn.local:hover { border-color: var(--emerald); }
 
-    /* Final CTA */
+    /* ── cta ─────────────────────────────────── */
     .cta-card {
-      background: linear-gradient(135deg, var(--bg-card) 0%, #1a1712 100%);
-      border: 1px solid rgba(217, 154, 78, 0.3);
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 24px;
-      padding: 3.5rem 2rem;
-      text-align: center;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px var(--gold-glow);
+      padding: 60px 30px 68px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
     }
-
-    .cta-card h2 {
-      margin-bottom: 1rem;
+    .cta-card::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--amber), var(--emerald), var(--sky));
     }
+    .cta-card h2 { font-family: var(--f-display); font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.02em; }
+    .cta-card p { color: var(--muted); margin: 14px auto 0; max-width: 520px; }
+    .cta-card .hero-cta { margin-top: 28px; justify-content: center; }
+    .foot-note { margin-top: 20px; font-size: 0.85rem; color: var(--dim); }
 
-    .cta-card p {
-      max-width: 580px;
-      margin: 0 auto 2rem;
-    }
-
-    /* Footer */
     footer {
-      padding: 2.5rem 0;
-      text-align: center;
-      border-top: 1px solid var(--rule);
+      border-top: 1px solid var(--border-soft);
+      margin-top: 72px;
+      padding: 34px 0;
     }
-
-    .footer-text {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 2.5px;
-      color: var(--text-muted);
+    .footer-inner {
+      max-width: 1120px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      color: var(--dim); font-size: 0.85rem;
     }
+    .footer-inner a { color: var(--muted); text-decoration: none; margin-left: 18px; }
+    .footer-inner a:hover { color: var(--amber); }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: var(--emerald); font-family: var(--f-mono); font-size: 0.78rem; }
+    .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); }
 
-    /* Responsive */
-    @media (max-width: 760px) {
-      section {
-        padding: 3rem 0;
-      }
-      
-      nav .container {
-        flex-direction: column;
-        gap: 1rem;
-      }
-
-      .card-grid, .provider-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-actions {
-        flex-direction: column;
-        width: 100%;
-      }
-
-      .btn {
-        width: 100%;
-      }
-
-      .arch-pre {
-        font-size: 0.78rem;
-        padding: 1.25rem;
-      }
-    }
-
-    /* Motion preferences */
-    @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 3px solid var(--bg); }
   </style>
 </head>
 <body>
 
-  <!-- Navigation -->
+  <!-- nav -->
   <nav>
-    <div class="container">
-      <a href="#" class="brand" aria-label="pixi Homepage">
-        <span class="brand-title">pixi</span>
-        <span class="brand-subtitle">FOR WINDOWS</span>
-      </a>
-      <a href="pixi-bot.html" class="btn btn-secondary" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
-        Try the interaction demo
-      </a>
+    <div class="nav-inner">
+      <div class="brand">
+        <span class="logo">P</span>
+        pixi
+      </div>
+      <div class="nav-links">
+        <a href="#about">About</a>
+        <a href="#gap">The gap</a>
+        <a href="#window">Experience</a>
+        <a href="#specs">Specs</a>
+        <a href="#memory">Memory</a>
+      </div>
+      <div class="nav-actions">
+        <a class="btn btn-ghost btn-sm" href="https://github.com/Kapil564/pixi" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          Source
+        </a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/Kapil564/pixi/releases/latest" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a.75.75 0 0 1 .75.75v5.69l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1zM2.75 12.5A2.25 2.25 0 0 0 5 14.75h6a2.25 2.25 0 0 0 2.25-2.25V11a.75.75 0 0 1 1.5 0v1.5a3.75 3.75 0 0 1-3.75 3.75H5a3.75 3.75 0 0 1-3.75-3.75V11a.75.75 0 0 1 1.5 0v1.5z"/></svg>
+          Download
+        </a>
+      </div>
     </div>
   </nav>
 
-  <main>
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="container">
-        
-        <div class="hero-orb-wrapper">
-          <div class="orb-canvas-container">
-            <canvas id="heroOrbCanvas" class="orb-canvas" width="260" height="240" aria-label="Live animated pixel art orb mascot representing pixi's status"></canvas>
-          </div>
-          <div id="heroStateBadge" class="state-badge">
-            <span class="state-dot" id="heroStateDot"></span>
-            <span id="heroStateText">IDLE</span>
-          </div>
-        </div>
+  <!-- hero -->
+  <section class="hero wrap">
+    <div>
+      <span class="hero-chip"><span class="pulse"></span> 100% local · open source · no account required</span>
 
-        <h1 class="hero-headline">Siri, without the cloud strings attached.</h1>
-        <p class="hero-subhead">
-          A modular, privacy-first desktop voice assistant for Windows. Complete control over your speech, LLM, and synthesis engines with 100% local offline fallback.
+      <h1>
+        <span id="typeLine1">Your voice.</span><br>
+        <span id="typeLine2" class="accent">Your machine.</span><br>
+        <span id="typeLine3" class="dim">No cloud, no drama.</span><span id="typeCursor" class="type-cursor">|</span>
+      </h1>
+
+      <p class="hero-sub">
+        A privacy-first voice assistant for Windows. Wake it with a word, speak naturally, and keep every byte on your own disk.
+      </p>
+
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/Kapil564/pixi/releases/latest" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a.75.75 0 0 1 .75.75v5.69l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1zM2.75 12.5A2.25 2.25 0 0 0 5 14.75h6a2.25 2.25 0 0 0 2.25-2.25V11a.75.75 0 0 1 1.5 0v1.5a3.75 3.75 0 0 1-3.75 3.75H5a3.75 3.75 0 0 1-3.75-3.75V11a.75.75 0 0 1 1.5 0v1.5z"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/Kapil564/pixi" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          View source
+        </a>
+      </div>
+
+      <div class="hero-chip-row">
+        <span class="mini-chip">Electron</span>
+        <span class="mini-chip">React</span>
+        <span class="mini-chip">TypeScript</span>
+        <span class="mini-chip">SQLite</span>
+        <span class="mini-chip">MIT license</span>
+      </div>
+    </div>
+
+    <!-- live mascot card -->
+    <div class="orb-card">
+      <div class="orb-frame">
+        <canvas id="heroOrbCanvas" class="orb" width="260" height="240" aria-label="Animated pixel-art mascot representing pixi"></canvas>
+      </div>
+      <div class="state-row">
+        <span class="state-badge">
+          <span class="state-dot" id="heroStateDot"></span>
+          <span id="heroStateText">IDLE</span>
+        </span>
+        <span class="orb-card foot"><span style="width:8px;height:8px;border-radius:50%;background:var(--emerald);display:inline-block"></span> live — this is your pixi</span>
+      </div>
+      <p class="orb-caption">The actual mascot from the app, rendered live on canvas.</p>
+    </div>
+  </section>
+
+  <!-- promo: local, no paid apis -->
+  <section class="wrap" style="padding-top:0">
+    <div class="promo">
+      <div class="kick">Zero config · zero cost · zero privacy loss</div>
+      <h2>Local. <span class="hl">No paid API configuration.</span> One pipeline, end to end.</h2>
+
+      <div class="pipeline">
+        <div class="pipe-node"><small>STT · local</small><b>faster-whisper</b></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node"><small>LLM · local</small><b>Ollama · llama 3.2</b></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node"><small>TTS · local</small><b>Piper · Windows SAPI5</b></div>
+      </div>
+
+      <p class="promo-note">
+        Speech, thinking, and voice — every stage runs <strong>on your machine</strong>, with no keys and no subscriptions.
+        Open source under MIT: <strong>configure it, or extend it with capabilities for your own use case.</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- what is pixi -->
+  <section id="about" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">What is pixi</div>
+      <h2 class="section-title">A boot sequence that says everything</h2>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">pixi · system boot</span>
+          <span class="panel-dots"><i style="background:#f97066"></i><i style="background:#f0a84e"></i><i style="background:#3ddc97"></i></span>
+        </div>
+        <div class="mono-panel">
+          <div><span class="prompt">$</span> pixi --offline</div>
+          <div>[<span class="ok">ok</span>] <span class="dim">stt ..............</span> faster-whisper (local)</div>
+          <div>[<span class="ok">ok</span>] <span class="dim">llm ..............</span> ollama / llama3.2</div>
+          <div>[<span class="ok">ok</span>] <span class="dim">tts ..............</span> windows sapi5 + piper</div>
+          <div>[<span class="ok">ok</span>] <span class="dim">memory ...........</span> %APPDATA%\pixi\</div>
+          <div>[<span class="ok">ok</span>] <span class="dim">hotkey ...........</span> ctrl+shift+space</div>
+          <div><span class="prompt">READY.</span> <span class="cursor-blink">▊</span> say "hey pixi" anytime.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">about.txt</span>
+          <span class="panel-dots"><i style="background:#3ddc97"></i></span>
+        </div>
+        <p style="margin-bottom:14px">
+          <strong style="color:var(--text)">pixi</strong> is a native Windows voice assistant built with
+          <code>Electron</code>, <code>React</code>, and <code>TypeScript</code>. It answers with the LLM of
+          your choice, speaks back in a voice you pick, and remembers everything as
+          <strong style="color:var(--emerald)">plain Markdown files on your own disk</strong>.
         </p>
-
-        <div class="hero-actions">
-          <a href="pixi-bot.html" class="btn btn-primary">Try the interaction demo</a>
-          <a href="#architecture" class="btn btn-secondary">See how it's built</a>
-        </div>
-
-        <div class="hero-tags">
-          <span class="chip">Electron</span>
-          <span class="chip">React</span>
-          <span class="chip">TypeScript</span>
-          <span class="chip">SQLite</span>
-        </div>
-
+        <ul>
+          <li><span style="color:var(--text)">100% offline mode</span> — zero data ever leaves your PC.</li>
+          <li>Cloud keys fully optional: OpenAI, Gemini, Groq, Fish Audio, ElevenLabs, Azure.</li>
+          <li>Wake it with <span class="kbd">"Hey pixi"</span> or <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">Space</span>.</li>
+          <li>Reminders, to-dos, and long-term memory stored locally in SQLite.</li>
+          <li>Open source under the <code>MIT</code> license.</li>
+        </ul>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Why pixi Exists -->
-    <section>
-      <div class="container">
-        <div class="eyebrow">THE MOTIVATION</div>
-        <h2>Why pixi exists</h2>
-        
-        <div class="card-grid">
-          
-          <!-- Left Card: The Problem -->
-          <div class="card">
-            <h3 class="card-title">The problem</h3>
-            <ul class="bullet-list">
-              <li class="bullet-item">
-                <span class="bullet-dot ember"></span>
-                <span>Existing desktop voice assistants are tightly locked to proprietary cloud ecosystems — telemetry, mandatory accounts, and static cloud endpoints.</span>
-              </li>
-              <li class="bullet-item">
-                <span class="bullet-dot ember"></span>
-                <span>They break completely when cloud APIs are unavailable or when your internet drops.</span>
-              </li>
-              <li class="bullet-item">
-                <span class="bullet-dot ember"></span>
-                <span>Users have zero local control over which speech, intent, or text-to-speech provider is doing the work.</span>
-              </li>
-            </ul>
-          </div>
+  <!-- what was missing -->
+  <section id="gap" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">The gap</div>
+      <h2 class="section-title">What Windows was missing</h2>
+      <p class="section-desc">Windows shipped Cortana for years, then quietly retired it. Users were left with a hole where an assistant should live.</p>
+    </div>
 
-          <!-- Right Card: What pixi Does Instead -->
-          <div class="card">
-            <h3 class="card-title">What pixi does instead</h3>
-            <ul class="bullet-list">
-              <li class="bullet-item">
-                <span class="bullet-dot sage"></span>
-                <span>Architected around a modular, local-first engine with a central orchestrator.</span>
-              </li>
-              <li class="bullet-item">
-                <span class="bullet-dot sage"></span>
-                <span>Pluggable STT / LLM / TTS providers with automatic fallback for 100% offline operation.</span>
-              </li>
-              <li class="bullet-item">
-                <span class="bullet-dot sage"></span>
-                <span>Long-term memory stored locally in SQLite (<code>%APPDATA%\pixi\assistant.db</code>) and human-editable Markdown memory files.</span>
-              </li>
-            </ul>
-          </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">C:\WINDOWS\history.log</span>
+          <span class="panel-dots"><i style="background:#f97066"></i><i style="background:#f97066"></i><i style="background:#f97066"></i></span>
+        </div>
+        <div class="log-row"><span class="icon">✕</span><span class="path">cortana.service — deprecated → removed</span></div>
+        <div class="log-row"><span class="icon">✕</span><span class="path">builtin.assistant — not found</span></div>
+        <div class="log-row"><span class="icon">✕</span><span class="path">voice-cmd-local — not found</span></div>
+        <div class="log-row"><span class="icon">✕</span><span class="path">offline.stt-llm-tts — not found</span></div>
+        <div class="log-row"><span class="icon">✕</span><span class="path">pluggable.ai-provider — not found</span></div>
+        <div class="log-row ok"><span class="icon">✓</span><span class="path">pixi.exe — gap resolved</span></div>
+      </div>
 
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">the-gap.txt</span>
+          <span class="panel-dots"><i style="background:#f0a84e"></i></span>
+        </div>
+        <ul>
+          <li><strong>Cortana is gone.</strong> Microsoft retired its built-in assistant with no replacement.</li>
+          <li><strong>Cloud lock-in.</strong> Other assistants demand accounts, telemetry, and closed ecosystems.</li>
+          <li><strong>Internet dependency.</strong> Cloud-only voice AI dies the second your connection drops.</li>
+          <li><strong>Zero local control.</strong> No way to choose who does the speech, the thinking, or the voice.</li>
+          <li><strong>No memory you can read.</strong> Preferences locked in vendor databases instead of files you own.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- a new window experience -->
+  <section id="window" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">A new kind of window</div>
+      <h2 class="section-title">How pixi creates a new window experience</h2>
+      <p class="section-desc">Not a webpage in a frame — a floating native layer that hangs over Windows itself. Two UIs, one pixi, zero chrome.</p>
+    </div>
+
+    <div class="grid3">
+      <div class="card">
+        <h3><span class="green">▣</span> Pixel blob mascot</h3>
+        <p>
+          A lightweight, always-on-top pixel-art orb that sits on your desktop and
+          <strong style="color:var(--text)">reacts to its state</strong> — idle, listening, thinking, speaking —
+          drawn live on canvas. You're watching a real one in the hero.
+        </p>
+      </div>
+      <div class="card">
+        <h3><span class="blue">▣</span> Windows 11 widget bar</h3>
+        <p>
+          A frameless, <span style="color:var(--sky)">Catppuccin</span>-themed acrylic widget docked into your workflow:
+          continuous voice-activity feedback, live logs, and instant provider switching. It feels native to Windows 11.
+        </p>
+      </div>
+      <div class="card">
+        <h3><span class="red">▣</span> Native integration</h3>
+        <ul>
+          <li>Lives in the <code>system tray</code> with autostart on login.</li>
+          <li><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">Space</span> summons it from anywhere.</li>
+          <li>Speak over it to interrupt — instant, zero audio stacking.</li>
+          <li>Sleep / wake / unlock resurface overdue reminders.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- specs -->
+  <section id="specs" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Spec sheet</div>
+      <h2 class="section-title">Everything else worth knowing</h2>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">features.dat</span>
+          <span class="panel-dots"><i style="background:#f0a84e"></i></span>
+        </div>
+        <div class="feat-grid">
+          <button class="feat-btn" title="Runs fully offline — zero data leaves your PC, falls back to local engines">
+            <span class="mark green"></span>100% Local
+          </button>
+          <button class="feat-btn" title="Wake word “Hey pixi” + global hotkey Ctrl+Shift+Space, with continuous VAD">
+            <span class="mark"></span>Hey pixi wake
+          </button>
+          <button class="feat-btn" title="Speak or click mid-answer to interrupt — zero audio stacking">
+            <span class="mark"></span>Barge-in
+          </button>
+          <button class="feat-btn" title="One click swaps between pixel blob orb and the Win11 widget bar">
+            <span class="mark"></span>Dual UI
+          </button>
+          <button class="feat-btn" title="Long-term memory in editable Markdown files on your disk">
+            <span class="mark"></span>Memory
+          </button>
+          <button class="feat-btn" title="Recurring reminders & to-dos via local SQLite + scheduler">
+            <span class="mark"></span>Scheduling
+          </button>
         </div>
       </div>
-    </section>
 
-    <!-- Two Ways to See Her -->
-    <section>
-      <div class="container">
-        <div class="eyebrow">DUAL UI MODES</div>
-        <h2>Two ways to see her</h2>
-        
-        <div class="card-grid">
-          
-          <!-- Card 1: Mascot Orb -->
-          <div class="card">
-            <div class="mascot-card-preview">
-              <canvas id="cardOrbCanvas" class="orb-canvas" width="130" height="120" style="width: 130px; height: 120px;"></canvas>
-            </div>
-            <h3 class="card-title">Pixel-art mascot orb</h3>
-            <p>
-              A lightweight, floating pixel-art orb mascot that sits on your desktop, live-drawn on canvas to reflect state changes—idle, listening, thinking, and speaking—with micro-animations.
-            </p>
-          </div>
-
-          <!-- Card 2: Windows 11 Widget -->
-          <div class="card">
-            <div class="widget-mockup">
-              <div class="mockup-header">
-                <div class="mockup-dots">
-                  <span class="mockup-dot" style="background: #f38ba8;"></span>
-                  <span class="mockup-dot" style="background: #f9e2af;"></span>
-                  <span class="mockup-dot" style="background: #a6e3a1;"></span>
-                </div>
-                <span class="mockup-badge">Mockup Only</span>
-              </div>
-              <div class="mockup-body">
-                <div class="skeleton-line short"></div>
-                <div class="skeleton-line medium"></div>
-                <div class="skeleton-line accent"></div>
-                <div class="skeleton-line medium" style="width: 50%;"></div>
-              </div>
-            </div>
-            <h3 class="card-title">Windows 11 widget</h3>
-            <p>
-              A Catppuccin-themed frameless desktop widget interface for Windows 11, providing continuous voice activity feedback, real-time logs, and instant provider switches.
-            </p>
-          </div>
-
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">providers</span>
+          <span class="panel-dots"><i style="background:#3ddc97"></i></span>
         </div>
-      </div>
-    </section>
-
-    <!-- Under the Hood -->
-    <section id="architecture">
-      <div class="container">
-        <div class="eyebrow">ARCHITECTURE</div>
-        <h2>Under the hood</h2>
-        
-        <pre class="arch-pre">
-<span class="gold">Electron Tray App (Main Process)</span>
-  ├── Global Hotkey (<span class="bright">Ctrl+Shift+Space</span>) & System Tray Menu
-  ├── System Sleep / Wake / Screen Unlock Monitors
-  └── Transparent Frameless Overlay (Widget / Mascot)
-        <span class="bright">↕ Socket.io IPC</span>
-<span class="gold">Node.js Orchestrator & Task Scheduler</span>
-  ├── Pluggable STT  ──> OpenAI Whisper · Groq Whisper · <span class="sage">Local faster-whisper</span>
-  ├── Pluggable LLM  ──> GPT-4o-mini · Gemini Flash · Groq Llama · <span class="sage">Local Ollama</span>
-  ├── Pluggable TTS  ──> Fish Audio · ElevenLabs · Azure · <span class="sage">SAPI5 / Piper</span>
-  └── Local Storage  ──> <span class="sage">SQLite (assistant.db) + Markdown memory</span>
-        </pre>
-      </div>
-    </section>
-
-    <!-- Choose Your Providers -->
-    <section>
-      <div class="container">
-        <div class="eyebrow">PLUGGABLE PIPELINE</div>
-        <h2>Choose your providers</h2>
-        
-        <div class="provider-grid">
-          
-          <!-- Column 1: STT -->
-          <div class="provider-card">
-            <h3>STT (Speech-to-Text)</h3>
-            <div class="chip-cloud">
-              <span class="chip">OpenAI Whisper</span>
-              <span class="chip">Groq Whisper</span>
-              <span class="chip chip-offline">Local faster-whisper</span>
+        <div class="prov-stack">
+          <div class="prov-step">
+            <div class="step-label">STT</div>
+            <div class="prov-btns">
+              <span class="prov-btn">OpenAI Whisper</span>
+              <span class="prov-btn">Groq Whisper</span>
+              <span class="prov-btn local">faster-whisper</span>
             </div>
           </div>
-
-          <!-- Column 2: LLM -->
-          <div class="provider-card">
-            <h3>LLM (Intelligence)</h3>
-            <div class="chip-cloud">
-              <span class="chip">GPT-4o-mini</span>
-              <span class="chip">Gemini Flash</span>
-              <span class="chip">Groq Llama</span>
-              <span class="chip chip-offline">Local Ollama</span>
+          <div class="prov-step">
+            <div class="step-label">LLM</div>
+            <div class="prov-btns">
+              <span class="prov-btn">GPT-4o-mini</span>
+              <span class="prov-btn">Gemini Flash</span>
+              <span class="prov-btn">Groq Llama</span>
+              <span class="prov-btn local">Ollama 3.2</span>
             </div>
           </div>
-
-          <!-- Column 3: TTS -->
-          <div class="provider-card">
-            <h3>TTS (Voice Output)</h3>
-            <div class="chip-cloud">
-              <span class="chip">Fish Audio</span>
-              <span class="chip">ElevenLabs</span>
-              <span class="chip">Azure</span>
-              <span class="chip chip-offline">Windows SAPI5 / Piper</span>
+          <div class="prov-step">
+            <div class="step-label">TTS</div>
+            <div class="prov-btns">
+              <span class="prov-btn">Fish Audio</span>
+              <span class="prov-btn">ElevenLabs</span>
+              <span class="prov-btn">Azure</span>
+              <span class="prov-btn local">Piper · SAPI5</span>
             </div>
           </div>
-
-        </div>
-
-        <div class="provider-footnote">
-          <span class="indicator"></span>
-          <span>Chips styled in sage support 100% offline local execution with zero internet or API requirements.</span>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Native to Windows -->
-    <section>
-      <div class="container">
-        <div class="eyebrow">DEEP OS INTEGRATION</div>
-        <h2>Native to Windows</h2>
-        
-        <div class="native-grid">
-          
-          <div class="fact-block">
-            <h3 class="fact-title">Tray app, global hotkey & autostart</h3>
-            <p class="fact-desc">
-              Runs quietly in the Windows System Tray. Press <code>Ctrl+Shift+Space</code> anywhere across the OS to summon pixi immediately. Configured to auto-start on boot via <code>openAtLogin</code>.
-            </p>
-          </div>
+  <!-- memory -->
+  <section id="memory" class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Memory</div>
+      <h2 class="section-title">It remembers — all on your disk</h2>
+      <p class="section-desc">pixi learns your preferences, routines, and identity as you talk. Every fact it knows lives in plain files you can open, read, and edit.</p>
+    </div>
 
-          <div class="fact-block">
-            <h3 class="fact-title">Frameless overlay & OS notifications</h3>
-            <p class="fact-desc">
-              Frameless, transparent, always-on-top window overlay for both the Catppuccin widget and pixel mascot. Native Windows desktop popups powered by <code>node-notifier</code>.
-            </p>
-          </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">how memory works</span>
+          <span class="panel-dots"><i style="background:#f0a84e"></i></span>
+        </div>
+        <ul>
+          <li>Profile, preferences, routines, people, and projects — each in its own <span style="color:var(--text)">Markdown file</span>.</li>
+          <li>Extracted in the background while you chat, so it never blocks a reply.</li>
+          <li>Kept strictly inside <code>%APPDATA%\pixi\</code> — no central server, no telemetry.</li>
+          <li>Every memory is a <strong style="color:var(--amber)">file you can open and edit</strong> any time.</li>
+        </ul>
+      </div>
 
-          <div class="fact-block">
-            <h3 class="fact-title">Sleep, wake & unlock reminder checks</h3>
-            <p class="fact-desc">
-              Monitors system sleep, wake, and screen-unlock events in real time to scan <code>%APPDATA%\pixi\assistant.db</code> and surface overdue reminders as soon as you unlock your device.
-            </p>
-          </div>
-
+      <div class="card">
+        <div class="panel-head">
+          <span class="panel-title">%APPDATA%\pixi\</span>
+          <span class="panel-dots"><i style="background:#3ddc97"></i></span>
+        </div>
+        <div class="mono-panel">
+          <div><span class="gold">%APPDATA%\pixi\</span></div>
+          <div class="dim">├─ assistant.db &nbsp;<span class="leaf">(sqlite · sessions · reminders · todos)</span></div>
+          <div class="dim">├─ memory\</div>
+          <div class="leaf">&nbsp;&nbsp;├─ profile.md</div>
+          <div class="leaf">&nbsp;&nbsp;├─ preferences.md</div>
+          <div class="leaf">&nbsp;&nbsp;├─ routines.md</div>
+          <div class="leaf">&nbsp;&nbsp;├─ projects\</div>
+          <div class="leaf">&nbsp;&nbsp;└─ people\</div>
+          <div class="dim">└─ archive\sessions\</div>
+          <div class="leaf">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ *.jsonl.gz &nbsp;<span class="dim">(gzip logs)</span></div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Final CTA -->
-    <section>
-      <div class="container">
-        <div class="cta-card">
-          <h2>Try the interaction demo</h2>
-          <p>
-            The native Windows desktop application is currently under active development. Experience the live state machine and speech flow right now in your browser.
-          </p>
-          <a href="pixi-bot.html" class="btn btn-primary">Launch Interactive Demo</a>
-        </div>
+  <!-- final cta -->
+  <section class="wrap">
+    <div class="cta-card">
+      <h2>Grab your copy. Keep your voice.</h2>
+      <p>Windows 10 / 11 x64 · Electron · open source under MIT.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/Kapil564/pixi/releases/latest" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a.75.75 0 0 1 .75.75v5.69l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1zM2.75 12.5A2.25 2.25 0 0 0 5 14.75h6a2.25 2.25 0 0 0 2.25-2.25V11a.75.75 0 0 1 1.5 0v1.5a3.75 3.75 0 0 1-3.75 3.75H5a3.75 3.75 0 0 1-3.75-3.75V11a.75.75 0 0 1 1.5 0v1.5z"/></svg>
+          Download Setup (.exe)
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/Kapil564/pixi" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          View source
+        </a>
       </div>
-    </section>
-  </main>
+      <p class="foot-note">Runs on your machine. No account, no cloud, no strings.</p>
+    </div>
+  </section>
 
-  <!-- Footer -->
   <footer>
-    <div class="container">
-      <div class="footer-text">pixi — Electron · React · TypeScript · SQLite</div>
+    <div class="footer-inner">
+      <span>© 2026 pixi — MIT licensed</span>
+      <div>
+        <span class="status"><i></i> ONLINE</span>
+        <a href="https://github.com/Kapil564/pixi/releases" target="_blank" rel="noopener">releases</a>
+        <a href="https://github.com/Kapil564/pixi" target="_blank" rel="noopener">github</a>
+      </div>
     </div>
   </footer>
 
-  <!-- Canvas Pixel-Art Orb Renderer Factory & Auto-Cycler Script -->
   <script>
-    /**
-     * Canvas Pixel-Art Orb Renderer
-     * Draws pixi's pixel art mascot dynamically on an HTML5 canvas element.
-     * Grid size: ~26 x 24 logical pixels.
-     */
+    // ─── Pixel-art orb renderer ─────────────────────────────────
     function createOrb(canvas, options = {}) {
       const ctx = canvas.getContext('2d');
       const logicalW = 26;
       const logicalH = 24;
-      
-      let state = options.initialState || 'idle'; // 'idle' | 'listening' | 'speaking'
+      let state = options.initialState || 'idle';
       let t = 0;
       let animationFrameId = null;
 
-      // Color Palettes
       const PALETTES = {
-        idle: {
-          body: '#e2e5e7',
-          highlight: '#ffffff',
-          blush: '#f2a4b0',
-          outline: '#1e2028',
-          accentDot: '#d99a4e'
-        },
-        listening: {
-          body: '#76d18c',
-          highlight: '#a8f0b8',
-          blush: '#e895a2',
-          outline: '#1e2028',
-          accentDot: '#6fae8c'
-        },
-        speaking: {
-          body: '#f6dfa9',
-          highlight: '#fff5d6',
-          blush: '#f0989e',
-          outline: '#1e2028',
-          accentDot: '#e2694a'
-        }
+        idle:     { body: '#e2e5e7', highlight: '#ffffff', blush: '#f2a4b0', outline: '#1e2028', accent: '#d99a4e' },
+        listening:{ body: '#76d18c', highlight: '#a8f0b8', blush: '#e895a2', outline: '#1e2028', accent: '#6fae8c' },
+        thinking: { body: '#c7ccd6', highlight: '#ffffff', blush: '#b0b8c4', outline: '#1e2028', accent: '#5cbbf0' },
+        speaking: { body: '#f6dfa9', highlight: '#fff5d6', blush: '#f0989e', outline: '#1e2028', accent: '#e2694a' }
       };
 
-      function setState(newState) {
-        if (PALETTES[newState]) {
-          state = newState;
-        }
-      }
-
-      function getState() {
-        return state;
-      }
+      function setState(newState) { if (PALETTES[newState]) state = newState; }
+      function getState() { return state; }
 
       function drawPixel(x, y, color) {
-        const cellW = canvas.width / logicalW;
-        const cellH = canvas.height / logicalH;
         ctx.fillStyle = color;
-        ctx.fillRect(Math.floor(x * cellW), Math.floor(y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+        ctx.fillRect(Math.floor(x * canvas.width / logicalW), Math.floor(y * canvas.height / logicalH), Math.ceil(canvas.width / logicalW), Math.ceil(canvas.height / logicalH));
       }
 
       function renderFrame() {
         t += 0.05;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const p = PALETTES[state] || PALETTES.idle;
 
-        const palette = PALETTES[state] || PALETTES.idle;
+        for (let x = 5; x <= 20; x++)
+          for (let y = 6; y <= 19; y++)
+            if (!((x === 5 || x === 20) && (y === 6 || y === 19))) drawPixel(x, y, p.body);
+        for (let y = 11; y <= 14; y++) { drawPixel(3, y, p.body); drawPixel(4, y, p.body); drawPixel(21, y, p.body); drawPixel(22, y, p.body); }
 
-        // 1. Character Body (Rounded square)
-        // Head fill (X: 5 to 20, Y: 6 to 19)
-        for (let x = 5; x <= 20; x++) {
-          for (let y = 6; y <= 19; y++) {
-            // Cut corners for rounded effect
-            if ((x === 5 || x === 20) && (y === 6 || y === 19)) continue;
-            drawPixel(x, y, palette.body);
-          }
-        }
+        for (let x = 6; x <= 19; x++) { drawPixel(x, 5, p.outline); drawPixel(x, 20, p.outline); }
+        for (let y = 7; y <= 10; y++) { drawPixel(4, y, p.outline); drawPixel(21, y, p.outline); }
+        for (let y = 15; y <= 18; y++) { drawPixel(4, y, p.outline); drawPixel(21, y, p.outline); }
+        drawPixel(3,10,p.outline);drawPixel(2,11,p.outline);drawPixel(2,12,p.outline);drawPixel(2,13,p.outline);drawPixel(2,14,p.outline);drawPixel(3,15,p.outline);
+        drawPixel(22,10,p.outline);drawPixel(23,11,p.outline);drawPixel(23,12,p.outline);drawPixel(23,13,p.outline);drawPixel(23,14,p.outline);drawPixel(22,15,p.outline);
+        drawPixel(5,6,p.outline);drawPixel(20,6,p.outline);drawPixel(5,19,p.outline);drawPixel(20,19,p.outline);
 
-        // Side Ears (Left ear: X: 3..4, Y: 11..14; Right ear: X: 21..22, Y: 11..14)
-        for (let y = 11; y <= 14; y++) {
-          drawPixel(3, y, palette.body);
-          drawPixel(4, y, palette.body);
-          drawPixel(21, y, palette.body);
-          drawPixel(22, y, palette.body);
-        }
+        for (let x = 7; x <= 10; x++) drawPixel(x, 7, p.highlight);
+        drawPixel(7, 8, p.highlight);
+        for (let x = 6; x <= 8; x++) { drawPixel(x, 14, p.blush); drawPixel(x, 15, p.blush); }
+        for (let x = 17; x <= 19; x++) { drawPixel(x, 14, p.blush); drawPixel(x, 15, p.blush); }
 
-        // 2. Character Outline (#1e2028)
-        // Top edge
-        for (let x = 6; x <= 19; x++) drawPixel(x, 5, palette.outline);
-        // Bottom edge
-        for (let x = 6; x <= 19; x++) drawPixel(x, 20, palette.outline);
-        // Left & Right head vertical edges
-        for (let y = 7; y <= 10; y++) {
-          drawPixel(4, y, palette.outline);
-          drawPixel(21, y, palette.outline);
-        }
-        for (let y = 15; y <= 18; y++) {
-          drawPixel(4, y, palette.outline);
-          drawPixel(21, y, palette.outline);
-        }
-        // Ear outlines
-        drawPixel(3, 10, palette.outline);
-        drawPixel(2, 11, palette.outline);
-        drawPixel(2, 12, palette.outline);
-        drawPixel(2, 13, palette.outline);
-        drawPixel(2, 14, palette.outline);
-        drawPixel(3, 15, palette.outline);
-
-        drawPixel(22, 10, palette.outline);
-        drawPixel(23, 11, palette.outline);
-        drawPixel(23, 12, palette.outline);
-        drawPixel(23, 13, palette.outline);
-        drawPixel(23, 14, palette.outline);
-        drawPixel(22, 15, palette.outline);
-
-        // Corner diagonally cut outlines
-        drawPixel(5, 6, palette.outline);
-        drawPixel(20, 6, palette.outline);
-        drawPixel(5, 19, palette.outline);
-        drawPixel(20, 19, palette.outline);
-
-        // 3. Highlight Patch (Top-left)
-        for (let x = 7; x <= 10; x++) {
-          drawPixel(x, 7, palette.highlight);
-        }
-        drawPixel(7, 8, palette.highlight);
-
-        // 4. Blush Cheeks (Pink rectangles)
-        for (let x = 6; x <= 8; x++) {
-          drawPixel(x, 14, palette.blush);
-          drawPixel(x, 15, palette.blush);
-        }
-        for (let x = 17; x <= 19; x++) {
-          drawPixel(x, 14, palette.blush);
-          drawPixel(x, 15, palette.blush);
-        }
-
-        // 5. State-Specific Details
         if (state === 'idle') {
-          // Closed Dot-Line Eyes (3x1 line)
-          drawPixel(9, 11, palette.outline);
-          drawPixel(10, 11, palette.outline);
-          drawPixel(11, 11, palette.outline);
-
-          drawPixel(14, 11, palette.outline);
-          drawPixel(15, 11, palette.outline);
-          drawPixel(16, 11, palette.outline);
-
-          // Small "o" mouth (2x2)
-          drawPixel(12, 14, palette.outline);
-          drawPixel(13, 14, palette.outline);
-          drawPixel(12, 15, palette.outline);
-          drawPixel(13, 15, palette.outline);
-
-          // Drifting 'Z' Glyphs (2 purple floating Zs)
-          const zProgress1 = (t * 0.4) % 1;
-          const zProgress2 = (t * 0.4 + 0.5) % 1;
-
-          drawZGlyph(19 + Math.sin(t * 2) * 1.2, 8 - zProgress1 * 9, 1 - zProgress1);
-          drawZGlyph(21 + Math.cos(t * 2) * 1.2, 9 - zProgress2 * 9, 1 - zProgress2);
-        } 
-        else if (state === 'listening') {
-          // Dual Antennas with Blue Tips
-          // Left antenna
-          drawPixel(8, 4, palette.outline);
-          drawPixel(8, 3, palette.outline);
-          drawPixel(7, 2, palette.outline);
-          drawPixel(7, 1, '#5cbbf0'); // Blue tip
-          drawPixel(6, 1, palette.outline);
-          drawPixel(8, 1, palette.outline);
-          drawPixel(7, 0, palette.outline);
-
-          // Right antenna
-          drawPixel(17, 4, palette.outline);
-          drawPixel(17, 3, palette.outline);
-          drawPixel(18, 2, palette.outline);
-          drawPixel(18, 1, '#5cbbf0'); // Blue tip
-          drawPixel(17, 1, palette.outline);
-          drawPixel(19, 1, palette.outline);
-          drawPixel(18, 0, palette.outline);
-
-          // Wide Open Eyes with sine-moving glint
-          const glintOffset = Math.sin(t * 4) > 0 ? 1 : 0;
-          drawOpenEye(9, 10, glintOffset);
-          drawOpenEye(15, 10, glintOffset);
-
-          // Open alert "O" mouth (3x3 hollow)
-          drawPixel(12, 14, palette.outline);
-          drawPixel(13, 14, palette.outline);
-          drawPixel(11, 15, palette.outline);
-          drawPixel(14, 15, palette.outline);
-          drawPixel(12, 16, palette.outline);
-          drawPixel(13, 16, palette.outline);
-        } 
-        else if (state === 'speaking') {
-          // Wide Open Eyes with static glint
-          drawOpenEye(9, 10, 0);
-          drawOpenEye(15, 10, 0);
-
-          // Animating mouth cycling between flat line and taller rectangle
-          const talkCycle = Math.sin(t * 12) > 0;
-          if (talkCycle) {
-            // Taller open mouth
-            for (let x = 11; x <= 14; x++) {
-              for (let y = 14; y <= 16; y++) {
-                drawPixel(x, y, palette.outline);
-              }
-            }
-            drawPixel(12, 15, '#e2694a'); // Tongue fill
-            drawPixel(13, 15, '#e2694a');
+          drawPixel(9,11,p.outline);drawPixel(10,11,p.outline);drawPixel(11,11,p.outline);
+          drawPixel(14,11,p.outline);drawPixel(15,11,p.outline);drawPixel(16,11,p.outline);
+          drawPixel(12,14,p.outline);drawPixel(13,14,p.outline);drawPixel(12,15,p.outline);drawPixel(13,15,p.outline);
+          const z1 = (t * 0.4) % 1, z2 = (t * 0.4 + 0.5) % 1;
+          drawZGlyph(19 + Math.sin(t * 2) * 1.2, 8 - z1 * 9, 1 - z1);
+          drawZGlyph(21 + Math.cos(t * 2) * 1.2, 9 - z2 * 9, 1 - z2);
+        } else if (state === 'listening') {
+          drawPixel(8,4,p.outline);drawPixel(8,3,p.outline);drawPixel(7,2,p.outline);
+          drawPixel(7,1,'#5cbbf0');drawPixel(6,1,p.outline);drawPixel(8,1,p.outline);drawPixel(7,0,p.outline);
+          drawPixel(17,4,p.outline);drawPixel(17,3,p.outline);drawPixel(18,2,p.outline);
+          drawPixel(18,1,'#5cbbf0');drawPixel(17,1,p.outline);drawPixel(19,1,p.outline);drawPixel(18,0,p.outline);
+          const glint = Math.sin(t * 4) > 0 ? 1 : 0;
+          drawOpenEye(9, 10, glint); drawOpenEye(15, 10, glint);
+          drawPixel(12,14,p.outline);drawPixel(13,14,p.outline);
+          drawPixel(11,15,p.outline);drawPixel(14,15,p.outline);
+          drawPixel(12,16,p.outline);drawPixel(13,16,p.outline);
+        } else if (state === 'thinking') {
+          drawOpenEye(9, 10, 0); drawOpenEye(15, 10, 0);
+          drawPixel(12,14,p.outline);drawPixel(13,14,p.outline);
+          const c = `rgba(92, 187, 240, ${(1 - (t * 0.6 % 1)).toFixed(2)})`;
+          drawPixel(22, 5, c); drawPixel(23, 6, c); drawPixel(22, 7, c);
+        } else if (state === 'speaking') {
+          drawOpenEye(9, 10, 0); drawOpenEye(15, 10, 0);
+          if (Math.sin(t * 12) > 0) {
+            for (let x = 11; x <= 14; x++) for (let y = 14; y <= 16; y++) drawPixel(x, y, p.outline);
+            drawPixel(12, 15, '#e2694a'); drawPixel(13, 15, '#e2694a');
           } else {
-            // Flat closed line mouth
-            for (let x = 11; x <= 14; x++) {
-              drawPixel(x, 14, palette.outline);
-            }
+            for (let x = 11; x <= 14; x++) drawPixel(x, 14, p.outline);
           }
         }
-
         animationFrameId = requestAnimationFrame(renderFrame);
       }
 
-      function drawOpenEye(startX, startY, glintXOffset) {
-        // 3x3 eye box
-        for (let x = startX; x < startX + 3; x++) {
-          for (let y = startY; y < startY + 3; y++) {
-            drawPixel(x, y, '#1e2028');
-          }
-        }
-        // White glint pixel
-        drawPixel(startX + glintXOffset, startY, '#ffffff');
+      function drawOpenEye(sx, sy, gx) {
+        for (let x = sx; x < sx + 3; x++) for (let y = sy; y < sy + 3; y++) drawPixel(x, y, '#1e2028');
+        drawPixel(sx + gx, sy, '#ffffff');
       }
-
       function drawZGlyph(gx, gy, alpha) {
         if (alpha <= 0) return;
-        const color = `rgba(180, 140, 235, ${alpha.toFixed(2)})`;
-        // Draw small 3x3 Z shape
-        drawPixel(gx, gy, color);
-        drawPixel(gx + 1, gy, color);
-        drawPixel(gx + 2, gy, color);
-        drawPixel(gx + 1, gy + 1, color);
-        drawPixel(gx, gy + 2, color);
-        drawPixel(gx + 1, gy + 2, color);
-        drawPixel(gx + 2, gy + 2, color);
+        const c = `rgba(180, 140, 235, ${alpha.toFixed(2)})`;
+        drawPixel(gx,gy,c);drawPixel(gx+1,gy,c);drawPixel(gx+2,gy,c);
+        drawPixel(gx+1,gy+1,c);
+        drawPixel(gx,gy+2,c);drawPixel(gx+1,gy+2,c);drawPixel(gx+2,gy+2,c);
       }
 
-      function start() {
-        if (!animationFrameId) {
-          renderFrame();
-        }
-      }
-
-      function stop() {
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
-      }
-
+      function start() { if (!animationFrameId) renderFrame(); }
+      function stop() { if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } }
       start();
-
-      return {
-        setState,
-        getState,
-        stop,
-        start
-      };
+      return { setState, getState, stop, start };
     }
 
-    // Initialize Orbs
     document.addEventListener('DOMContentLoaded', () => {
-      // 1. Hero Auto-cycling Orb Instance
-      const heroCanvas = document.getElementById('heroOrbCanvas');
-      const heroStateText = document.getElementById('heroStateText');
-      const heroStateDot = document.getElementById('heroStateDot');
+      // Typewriter animation for hero headline
+      const line1El = document.getElementById('typeLine1');
+      const line2El = document.getElementById('typeLine2');
+      const line3El = document.getElementById('typeLine3');
+      const cursorEl = document.getElementById('typeCursor');
 
-      if (heroCanvas) {
-        const heroOrb = createOrb(heroCanvas, { initialState: 'idle' });
+      if (line1El && line2El && line3El && cursorEl) {
+        const text1 = "Your voice.";
+        const text2 = "Your machine.";
+        const text3 = "No cloud, no drama.";
 
-        const states = [
-          { name: 'idle', color: '#d99a4e' },
-          { name: 'listening', color: '#6fae8c' },
-          { name: 'speaking', color: '#e2694a' }
-        ];
-        let stateIdx = 0;
+        line1El.textContent = "";
+        line2El.textContent = "";
+        line3El.textContent = "";
 
-        setInterval(() => {
-          stateIdx = (stateIdx + 1) % states.length;
-          const currentState = states[stateIdx];
-          heroOrb.setState(currentState.name);
+        line1El.after(cursorEl);
 
-          if (heroStateText) {
-            heroStateText.textContent = currentState.name.toUpperCase();
+        function typeLine(text, el, speed, onComplete) {
+          let i = 0;
+          function tick() {
+            if (i <= text.length) {
+              el.textContent = text.slice(0, i);
+              i++;
+              setTimeout(tick, speed);
+            } else if (onComplete) {
+              setTimeout(onComplete, 220);
+            }
           }
-          if (heroStateDot) {
-            heroStateDot.style.background = currentState.color;
-            heroStateDot.style.boxShadow = `0 0 8px ${currentState.color}`;
-          }
-        }, 2800);
+          tick();
+        }
+
+        setTimeout(() => {
+          typeLine(text1, line1El, 55, () => {
+            line2El.after(cursorEl);
+            typeLine(text2, line2El, 55, () => {
+              line3El.after(cursorEl);
+              typeLine(text3, line3El, 45, null);
+            });
+          });
+        }, 350);
       }
 
-      // 2. Card Preview Orb Instance
-      const cardCanvas = document.getElementById('cardOrbCanvas');
-      if (cardCanvas) {
-        const cardOrb = createOrb(cardCanvas, { initialState: 'listening' });
+      // Hero orb auto-cycle
+      const heroCanvas = document.getElementById('heroOrbCanvas');
+      const heroDot = document.getElementById('heroStateDot');
+      const heroText = document.getElementById('heroStateText');
+      if (heroCanvas) {
+        const hero = createOrb(heroCanvas, { initialState: 'idle' });
+        const states = [
+          { name: 'idle', color: '#f0a84e' },
+          { name: 'listening', color: '#3ddc97' },
+          { name: 'thinking', color: '#7aa5e8' },
+          { name: 'speaking', color: '#f97066' }
+        ];
+        let i = 0;
+        setInterval(() => {
+          i = (i + 1) % states.length;
+          hero.setState(states[i].name);
+          heroText.textContent = states[i].name.toUpperCase();
+          heroDot.style.background = states[i].color;
+          heroDot.style.boxShadow = `0 0 10px ${states[i].color}`;
+        }, 2600);
       }
     });
   </script>

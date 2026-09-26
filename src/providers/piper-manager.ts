@@ -2,9 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAppPaths } from '../shared/paths';
 import { fetchWithRetry } from '../shared/http-util';
-import { downloadFileWithProgress } from '../shared/download';
+import { downloadFileWithProgress, downloadAndExtractZip } from '../shared/download';
 import { findLocalBinary } from '../shared/disk-util';
-import { createLocalAssetManager, ensureDataSubdir } from '../shared/local-asset-manager';
 
 export interface PiperStatus {
   voiceName: string;
@@ -31,104 +30,125 @@ const VOICE_URLS: Record<string, { onnx: string; json: string }> = {
   },
 };
 
-const voicesDir = () => ensureDataSubdir('voices');
+const PIPER_WINDOWS_BIN_URL = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip';
 
-const findPiperBinary = () => findLocalBinary({
-  envVar: 'PIPER_BINARY',
-  knownNames: ['piper.exe', 'piper-tts.exe', path.join('piper', 'piper.exe')],
-  binDir: path.join(getAppPaths().userDataDir, 'bin'),
-});
+let selectedVoice = process.env.PIPER_LOCAL_VOICE || 'en_US-amy-medium';
+let isDownloading = false;
+let downloadProgress = 0;
 
-const piperManager = createLocalAssetManager({
-  assetLabel: 'Piper voice',
-  assetTerm: 'voice',
-  selectionTerm: 'voice model',
-  dirName: 'voices',
-  selectionEnvVar: 'PIPER_LOCAL_VOICE',
-  defaultSelection: 'en_US-amy-medium',
-  logPrefix: 'Piper Manager',
-  hasAsset: (name) => Boolean(VOICE_URLS[name]),
-  isDownloaded: (name) => {
-    const onnxPath = path.join(voicesDir(), `${name}.onnx`);
-    const jsonPath = path.join(voicesDir(), `${name}.onnx.json`);
-    return fs.existsSync(onnxPath) && fs.existsSync(jsonPath) && fs.statSync(onnxPath).size > 5 * 1024 * 1024;
-  },
-  getAssetPath: (name) => path.join(voicesDir(), `${name}.onnx`),
-  downloadAsset: async (name, targetPath, onProgress) => {
-    const urls = VOICE_URLS[name];
+function voicesDir(): string {
+  const dir = path.join(getAppPaths().userDataDir, 'voices');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function findPiperBinary(): string | undefined {
+  return findLocalBinary({
+    envVar: 'PIPER_BINARY',
+    knownNames: ['piper.exe', 'piper-tts.exe', path.join('piper', 'piper.exe')],
+    binDir: path.join(getAppPaths().userDataDir, 'bin'),
+  });
+}
+
+export function getSelectedVoiceName(): string {
+  return selectedVoice;
+}
+
+export function setSelectedVoiceName(voiceName: string): void {
+  if (VOICE_URLS[voiceName]) {
+    selectedVoice = voiceName;
+    console.log(`[Piper Manager] Selected local voice model changed to: "${selectedVoice}"`);
+  }
+}
+
+export function isVoiceDownloaded(voiceName = selectedVoice): boolean {
+  const onnxPath = path.join(voicesDir(), `${voiceName}.onnx`);
+  const jsonPath = path.join(voicesDir(), `${voiceName}.onnx.json`);
+  return fs.existsSync(onnxPath) && fs.existsSync(jsonPath) && fs.statSync(onnxPath).size > 5 * 1024 * 1024;
+}
+
+export function getVoicePath(voiceName = selectedVoice): string {
+  return path.join(voicesDir(), `${voiceName}.onnx`);
+}
+
+export async function downloadPiperBinary(): Promise<boolean> {
+  if (findPiperBinary()) return true;
+  console.log('[Piper Manager] Downloading Piper executable for Windows...');
+  try {
+    await downloadAndExtractZip(
+      PIPER_WINDOWS_BIN_URL,
+      path.join(getAppPaths().userDataDir, 'bin'),
+      'piper_windows_amd64.zip',
+    );
+    return true;
+  } catch (err) {
+    console.error('[Piper Manager Binary Download Error]:', err);
+    return false;
+  }
+}
+
+export async function downloadPiperVoice(
+  voiceName = selectedVoice,
+  onProgress?: (progressPercent: number, statusText: string) => void
+): Promise<boolean> {
+  const urls = VOICE_URLS[voiceName];
+  if (!urls) {
+    console.error(`[Piper Manager] Unknown voice: ${voiceName}`);
+    return false;
+  }
+  if (isVoiceDownloaded(voiceName)) {
+    if (onProgress) onProgress(100, `Piper voice ${voiceName} ready.`);
+    return true;
+  }
+
+  isDownloading = true;
+  downloadProgress = 0;
+  const targetPath = getVoicePath(voiceName);
+
+  try {
+    // 1. Download JSON config
     const jsonRes = await fetchWithRetry(urls.json, undefined, 2, 1000);
     if (!jsonRes.ok) {
       throw new Error(`Failed to download Piper JSON config: HTTP ${jsonRes.status}`);
     }
     fs.writeFileSync(`${targetPath}.json`, await jsonRes.text(), 'utf-8');
 
+    // 2. Download ONNX model
     await downloadFileWithProgress(urls.onnx, targetPath, {
-      label: `Piper voice ${name}`,
-      fileName: `${name}.onnx`,
+      label: `Piper voice ${voiceName}`,
+      fileName: `${voiceName}.onnx`,
       defaultBytes: 55 * 1024 * 1024,
-      onProgress,
+      onProgress: (pct) => {
+        downloadProgress = pct;
+        if (onProgress) onProgress(pct, `Downloading Piper voice ${voiceName}: ${pct}%`);
+      },
     });
-  },
-  findBinary: findPiperBinary,
-  binaryDownloadUrl: 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip',
-  binaryZipName: 'piper_windows_amd64.zip',
-  binaryDisplayName: 'Piper executable',
-  buildStatusText: ({ name, downloading, progress, downloaded, binaryDownloaded }) => {
-    if (downloading) return `Downloading Piper voice ${name} (${progress}%)...`;
-    if (!downloaded || !binaryDownloaded) return `Piper setup pending (binary=${binaryDownloaded}, voice=${downloaded}).`;
-    return 'Ready';
-  },
-});
 
-export function getSelectedVoiceName(): string {
-  return piperManager.getSelection();
+    isDownloading = false;
+    downloadProgress = 100;
+    if (onProgress) onProgress(100, `Piper voice ${voiceName} download complete.`);
+    return true;
+  } catch (err) {
+    console.error(`[Piper Download Error]:`, err);
+    isDownloading = false;
+    return false;
+  }
 }
 
-export function setSelectedVoiceName(voiceName: string): void {
-  piperManager.setSelection(voiceName);
-}
-
-/**
- * Checks if a specific Piper voice model (.onnx and .onnx.json) exists in %APPDATA%\pixi\voices\
- */
-export function isVoiceDownloaded(voiceName = getSelectedVoiceName()): boolean {
-  return piperManager.isDownloaded(voiceName);
-}
-
-export function getVoicePath(voiceName = getSelectedVoiceName()): string {
-  return piperManager.getAssetPath(voiceName);
-}
-
-/**
- * Returns current status of local Piper voice model storage.
- */
 export function getPiperStatus(): PiperStatus {
-  const s = piperManager.getStatus();
+  const downloaded = isVoiceDownloaded(selectedVoice);
+  const binaryDownloaded = Boolean(findPiperBinary());
+  let statusText = 'Ready';
+  if (isDownloading) statusText = `Downloading Piper voice ${selectedVoice} (${downloadProgress}%)...`;
+  else if (!downloaded || !binaryDownloaded) statusText = `Piper setup pending (binary=${binaryDownloaded}, voice=${downloaded}).`;
+
   return {
-    voiceName: s.name,
-    voiceDownloaded: s.downloaded,
-    binaryDownloaded: s.binaryDownloaded,
-    downloading: s.downloading,
-    downloadProgress: s.downloadProgress,
-    statusText: s.statusText,
-    voicePath: s.assetPath,
+    voiceName: selectedVoice,
+    voiceDownloaded: downloaded,
+    binaryDownloaded,
+    downloading: isDownloading,
+    downloadProgress,
+    statusText,
+    voicePath: getVoicePath(selectedVoice),
   };
-}
-
-/**
- * Downloads Piper voice ONNX model and JSON config into %APPDATA%\pixi\voices\
- * with progress tracking.
- */
-export async function downloadPiperVoice(
-  voiceName?: string,
-  onProgress?: (progressPercent: number, statusText: string) => void
-): Promise<boolean> {
-  return piperManager.downloadAsset(voiceName, onProgress);
-}
-
-/**
- * Downloads Piper Windows binary zip and extracts piper.exe into %APPDATA%\pixi\bin\
- */
-export async function downloadPiperBinary(): Promise<boolean> {
-  return piperManager.downloadBinary();
 }

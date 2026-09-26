@@ -4,8 +4,6 @@ import {
   createPrimarySTTProvider,
   LocalWhisperSTT,
 } from './stt';
-import { withProviderFallback } from './provider-fallback';
-
 export class STTRouter implements STTProvider {
   public name = 'stt-router';
 
@@ -15,19 +13,14 @@ export class STTRouter implements STTProvider {
   ) {}
 
   async transcribe(audioBuffer: Buffer): Promise<TranscriptionResult> {
-    return withProviderFallback(
-      this.primary,
-      this.local,
-      (p) => p.transcribe(audioBuffer),
-      '[audio_input]',
-      {
-        routerName: 'STT Router',
-        fallbackNotice: 'Automatically failing over to local Whisper model...',
-        localProviderUsed: 'local-whisper',
-        title: 'pixi Offline STT',
-        message: 'API rate limit reached. Switched to local Whisper for transcription.',
-      },
-    );
+    if (this.primary) {
+      try {
+        return await this.primary.transcribe(audioBuffer);
+      } catch (err) {
+        console.warn(`[STT Router] Primary (${this.primary.name}) failed, falling back to local Whisper:`, err);
+      }
+    }
+    return this.local.transcribe(audioBuffer);
   }
 }
 

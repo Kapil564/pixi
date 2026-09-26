@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useSetupProgress } from '../useSetupProgress';
+import React, { useEffect, useState } from 'react';
 
 export interface OnboardingWizardProps {
   onComplete: () => void;
@@ -18,14 +17,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
 
   const assistant = (window as any).assistant;
 
-  useSetupProgress((p) => {
-    setSetupProgress(p.progress);
-    setSetupText(p.stepText);
-    if (p.isComplete) {
-      setIsSettingUp(false);
-      setStep(3);
-    }
-  });
+  useEffect(() => {
+    if (!assistant?.onSetupProgress) return;
+    const unsub = assistant.onSetupProgress((p: { progress: number; text: string }) => {
+      setSetupProgress(p.progress);
+      setSetupText(p.text);
+      if (p.progress >= 100) {
+        setIsSettingUp(false);
+        setStep(3);
+      }
+    });
+    return () => {
+      unsub?.();
+    };
+  }, [assistant]);
 
   const fetchLogs = async () => {
     if (assistant?.getSetupLogs) {

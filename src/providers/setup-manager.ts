@@ -8,7 +8,7 @@ import { logErrorToFile } from '../shared/error-logger';
 import { getSettings, saveSettings } from '../shared/settings-store';
 import { migrateLegacyModelAssets } from '../shared/model-migration';
 import { downloadWhisperBinary, downloadWhisperModel, getWhisperStatus } from './whisper-manager';
-import { getOllamaStatus, pullLocalModel, type OllamaStatus } from './ollama-manager';
+import { getOllamaStatus, pullLocalModel, tryStartOllamaService, type OllamaStatus } from './ollama-manager';
 import { downloadPiperBinary, downloadPiperVoice, getPiperStatus } from './piper-manager';
 import {
   evaluatePipelineReadiness,
@@ -215,30 +215,31 @@ export async function runFullSetupSequence(
 
     // ---------- STEP 2/3: LLM (Ollama service + model) ----------
     if (!cloudLlm) {
-      const ollamaStatus = await getOllamaStatus();
+      let ollamaStatus = await getOllamaStatus();
       if (!ollamaStatus.installed) {
-        const errMsg = 'Ollama is not installed. Download from https://ollama.com or configure OPENAI_API_KEY / GEMINI_API_KEY in .env';
-        addSetupLog(errMsg);
-        lastSetupError = errMsg;
-        isSettingUp = false;
-        if (onProgress) onProgress(35, errMsg);
-        return false;
+        throw new Error('Ollama is not installed. Download from https://ollama.com or configure OPENAI_API_KEY / GEMINI_API_KEY.');
       }
+
       if (!ollamaStatus.running) {
-        const errMsg = 'Ollama server is not running on port 11434. Please launch Ollama service.';
-        addSetupLog(errMsg);
-        lastSetupError = errMsg;
-        isSettingUp = false;
-        if (onProgress) onProgress(35, errMsg);
-        return false;
+        addSetupLog('Step 2/3 (LLM): Launching local Ollama background service...');
+        if (onProgress) onProgress(55, 'Step 2/3 (LLM): Starting Ollama service daemon...');
+        const started = await tryStartOllamaService();
+        if (!started) {
+          console.warn('[Setup LLM] tryStartOllamaService returned false, verifying status...');
+        }
+        ollamaStatus = await getOllamaStatus();
+        if (!ollamaStatus.running) {
+          throw new Error('Ollama service failed to start on port 11434.');
+        }
       }
+
       if (!ollamaStatus.modelDownloaded) {
-        addSetupLog('Step 2/3 (LLM): Pulling local Ollama LLM model...');
-        const pulled = await pullLocalModel((percent) => {
-          const overall = Math.round(35 + (percent / 100) * 50); // LLM occupies 35-85%
+        addSetupLog('Step 2/3 (LLM): Pulling local Ollama LLM model ("llama3.2:3b")...');
+        const pulled = await pullLocalModel((percent, statusText) => {
+          const overall = Math.round(55 + (percent / 100) * 30); // LLM model pull occupies 55-85%
           const logMsg = `Step 2/3 (Ollama LLM): ${percent}%`;
-          if (percent % 25 === 0) addSetupLog(logMsg);
-          if (onProgress) onProgress(overall, logMsg);
+          if (percent % 10 === 0) addSetupLog(logMsg);
+          if (onProgress) onProgress(overall, statusText || logMsg);
         });
         if (!pulled) {
           throw new Error('Failed to pull local Ollama LLM model.');
@@ -263,7 +264,7 @@ export async function runFullSetupSequence(
       if (!piperStatus.voiceDownloaded) {
         addSetupLog('Step 3/3 (TTS): Downloading local Piper TTS voice model...');
         const voiceOk = await downloadPiperVoice(piperStatus.voiceName, (percent) => {
-          const overall = Math.round(85 + (percent / 100) * 15); // TTS occupies 85-100%
+          const overall = Math.round(85 + (percent / 100) * 12); // TTS occupies 85-97%
           const logMsg = `Step 3/3 (Piper Voice): ${percent}%`;
           if (percent % 25 === 0) addSetupLog(logMsg);
           if (onProgress) onProgress(overall, logMsg);
@@ -280,6 +281,7 @@ export async function runFullSetupSequence(
     isSettingUp = false;
     lastSetupError = null;
     addSetupLog('Sequential setup sequence completed successfully (STT -> LLM -> TTS).');
+    if (onProgress) onProgress(100, 'Setup complete! All services ready.');
 
     // Refresh the shared readiness gate so the orchestrator/scheduler/renderer
     // see the new state immediately.

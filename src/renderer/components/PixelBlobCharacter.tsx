@@ -14,37 +14,37 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
   className = '',
   onClick,
 }) => {
-  // Monochrome (black & white) palette per phase — grayscale shifts communicate state
+  // Catppuccin colors per phase
   const getBlobColors = () => {
     switch (phase) {
       case 'listening':
         return {
-          body: '#d4d4d4',      // Light gray
-          border: '#0a0a0a',
-          blush: '#737373',
-          eye: '#0a0a0a',
+          body: '#7cd092ff',      // Teal
+          border: '#181825',
+          blush: '#f38ba8',
+          eye: '#11111b',
         };
       case 'thinking':
         return {
-          body: '#a3a3a3',      // Mid gray (processing)
-          border: '#0a0a0a',
-          blush: '#525252',
-          eye: '#0a0a0a',
+          body: '#f9e2af',      // Yellow
+          border: '#181825',
+          blush: '#f38ba8',
+          eye: '#11111b',
         };
       case 'speaking':
         return {
-          body: '#e5e5e5',      // Near white
-          border: '#0a0a0a',
-          blush: '#737373',
-          eye: '#0a0a0a',
+          body: '#f5c2e7',      // Pink
+          border: '#181825',
+          blush: '#f38ba8',
+          eye: '#11111b',
         };
       case 'idle':
       default:
         return {
-          body: '#f5f5f5',      // White (resting)
-          border: '#0a0a0a',
-          blush: '#737373',
-          eye: '#0a0a0a',
+          body: '#fbfbfbe4',      // Lavender
+          border: '#181825',
+          blush: '#f38ba8',
+          eye: '#11111b',
         };
     }
   };
@@ -122,10 +122,10 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
         {phase === 'idle' && (
           <g className="anim-bob">
             <g className="anim-z1">
-              <path d="M 21 6 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#a3a3a3" />
+              <path d="M 21 6 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#cba6f7" />
             </g>
             <g className="anim-z2">
-              <path d="M 23 3 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#d4d4d4" />
+              <path d="M 23 3 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#b4befe" />
             </g>
           </g>
         )}
@@ -133,22 +133,22 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
         {/* LISTENING: Animated Pixel Audio Equalizer Waves */}
         {phase === 'listening' && (
           <g transform="translate(10, 3)">
-            <rect x="0" y="2" width="2" height="6" rx="0.5" fill="#d4d4d4" className="anim-bar-1" />
-            <rect x="3.5" y="0" width="2" height="8" rx="0.5" fill="#ffffff" className="anim-bar-2" />
-            <rect x="7" y="1" width="2" height="7" rx="0.5" fill="#a3a3a3" className="anim-bar-3" />
-            <rect x="10.5" y="3" width="2" height="5" rx="0.5" fill="#d4d4d4" className="anim-bar-4" />
+            <rect x="0" y="2" width="2" height="6" rx="0.5" fill="#52ec59" className="anim-bar-1" />
+            <rect x="3.5" y="0" width="2" height="8" rx="0.5" fill="#f9e2af" className="anim-bar-2" />
+            <rect x="7" y="1" width="2" height="7" rx="0.5" fill="#89dceb" className="anim-bar-3" />
+            <rect x="10.5" y="3" width="2" height="5" rx="0.5" fill="#52ec59" className="anim-bar-4" />
           </g>
         )}
 
         {/* THINKING: Orbiting Pixel Ring */}
         {phase === 'thinking' && (
           <g className="anim-orbit-ring">
-            <rect x="15" y="4" width="2" height="2" fill="#ffffff" />
-            <rect x="28" y="18" width="2" height="2" fill="#a3a3a3" />
-            <rect x="15" y="30" width="2" height="2" fill="#ffffff" />
-            <rect x="2" y="18" width="2" height="2" fill="#a3a3a3" />
-            <rect x="24" y="8" width="1.5" height="1.5" fill="#d4d4d4" />
-            <rect x="6" y="26" width="1.5" height="1.5" fill="#d4d4d4" />
+            <rect x="15" y="4" width="2" height="2" fill="#f9e2af" />
+            <rect x="28" y="18" width="2" height="2" fill="#fab387" />
+            <rect x="15" y="30" width="2" height="2" fill="#f9e2af" />
+            <rect x="2" y="18" width="2" height="2" fill="#fab387" />
+            <rect x="24" y="8" width="1.5" height="1.5" fill="#cba6f7" />
+            <rect x="6" y="26" width="1.5" height="1.5" fill="#89dceb" />
           </g>
         )}
 
@@ -156,13 +156,13 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
         {phase === 'speaking' && (
           <g transform="translate(19, 13)">
             <g className="anim-note-1">
-              <rect x="2" y="2" width="2" height="2" fill="#ffffff" />
-              <rect x="3" y="0" width="1" height="4" fill="#ffffff" />
-              <rect x="4" y="0" width="2" height="1" fill="#ffffff" />
+              <rect x="2" y="2" width="2" height="2" fill="#f5c2e7" />
+              <rect x="3" y="0" width="1" height="4" fill="#f5c2e7" />
+              <rect x="4" y="0" width="2" height="1" fill="#f5c2e7" />
             </g>
             <g className="anim-note-2">
-              <rect x="4" y="4" width="2" height="2" fill="#a3a3a3" />
-              <rect x="5" y="2" width="1" height="4" fill="#a3a3a3" />
+              <rect x="4" y="4" width="2" height="2" fill="#89dceb" />
+              <rect x="5" y="2" width="1" height="4" fill="#89dceb" />
             </g>
           </g>
         )}
@@ -187,7 +187,7 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
           <rect x="27" y="18" width="3" height="5" rx="1" fill={colors.border} />
           <rect x="27" y="19" width="2" height="4" rx="0.5" fill={colors.body} />
 
-          {/* 5. Neutral Gray Cheeks (Blush) */}
+          {/* 5. Pink Pastel Cheeks (Blush) */}
           <rect x="7" y="20" width="3.5" height="2" fill={colors.blush} />
           <rect x="21.5" y="20" width="3.5" height="2" fill={colors.blush} />
 
@@ -241,8 +241,8 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
               <rect x="19.5" y="17" width="1" height="1" fill="#ffffff" />
               {/* Animated Talking Mouth */}
               <g className="anim-talking-mouth">
-                <rect x="14.5" y="21" width="3" height="2" rx="0.5" fill="#0a0a0a" />
-                <rect x="15" y="22" width="2" height="1" fill="#d4d4d4" />
+                <rect x="14.5" y="21" width="3" height="2" rx="0.5" fill="#11111b" />
+                <rect x="15" y="22" width="2" height="1" fill="#f38ba8" />
               </g>
             </g>
           )}

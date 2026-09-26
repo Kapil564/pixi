@@ -5,7 +5,6 @@ import { Windows11Widget } from './components/Windows11Widget';
 import { SetupBanner } from './components/SetupBanner';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { useVoiceCapture } from './useVoiceCapture';
-import { useSetupProgress } from './useSetupProgress';
 
 interface PipelineStageState {
   stage: string;
@@ -31,6 +30,8 @@ function App() {
   // Ordered pipeline gate (STT -> LLM -> TTS): voice + text input stay disabled
   // until the main process reports every stage ready.
   const [pipelineReady, setPipelineReady] = useState<boolean>(false);
+  const [pipelineProgress, setPipelineProgress] = useState<number>(0);
+  const [pipelineBlocker, setPipelineBlocker] = useState<string>('');
   const [pipelineStages, setPipelineStages] = useState<PipelineStageState[]>([]);
   const [viewMode, setViewMode] = useState<'orb' | 'widget'>('orb');
   const [orbPhase, setOrbPhase] = useState<OrbPhase>('idle');
@@ -40,8 +41,6 @@ function App() {
     setOrbPhase(phase);
   };
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-
-  const setupState = useSetupProgress();
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,6 +79,8 @@ function App() {
     if (assistant.onPipelineReadiness) {
       unsubscribe = assistant.onPipelineReadiness((data: PipelineReadinessState) => {
         setPipelineReady(Boolean(data?.ready));
+        if (data?.overallProgress !== undefined) setPipelineProgress(data.overallProgress);
+        if (data?.nextBlocker !== undefined) setPipelineBlocker(data.nextBlocker || '');
         if (data?.stages) setPipelineStages(data.stages);
       });
     }
@@ -90,6 +91,8 @@ function App() {
         .getSetupStatus()
         .then((st: any) => {
           setPipelineReady(Boolean(st?.pipeline?.ready ?? st?.isComplete));
+          if (st?.pipeline?.overallProgress !== undefined) setPipelineProgress(st.pipeline.overallProgress);
+          if (st?.pipeline?.nextBlocker !== undefined) setPipelineBlocker(st.pipeline.nextBlocker || '');
           if (st?.pipeline?.stages) {
             setPipelineStages(
               st.pipeline.stages.map((s: any) => ({
@@ -271,9 +274,9 @@ function App() {
       ) : viewMode === 'widget' ? (
         <div className="w-full flex flex-col items-center">
           <SetupBanner
-            isComplete={setupState.isComplete}
-            progress={setupState.progress}
-            stepText={setupState.stepText}
+            isComplete={pipelineReady}
+            progress={pipelineProgress}
+            stepText={pipelineBlocker || 'Setting up offline models...'}
             stages={pipelineStages}
           />
           <Windows11Widget

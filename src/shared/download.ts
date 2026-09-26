@@ -68,6 +68,8 @@ export async function downloadFileWithProgress(
           fileStream.end();
         });
 
+        console.log(`[Download] ${label} download finished (100%). Verifying integrity...`);
+
         const expectedHash = KNOWN_CHECKSUMS[checksumName];
         const integrity = await verifyFileIntegrity(tempPath, expectedHash);
         if (expectedHash && !integrity.valid) {
@@ -112,6 +114,7 @@ export async function downloadAndExtractZip(
   }
 
   const zipPath = path.join(os.tmpdir(), `${path.basename(zipName, '.zip')}_${Date.now()}.zip`);
+  console.log(`[Zip Download] Downloading binary release package "${zipName}" from ${url}...`);
 
   try {
     const res = await fetchWithRetry(url, undefined, 3, 1500);
@@ -139,7 +142,7 @@ export async function downloadAndExtractZip(
       console.warn(`[Zip Download] Non-critical warning: SHA-256 mismatch for ${zipName}. Proceeding with extraction...`);
     }
 
-    console.log(`[Zip Download] Extracting zip to ${destDir}...`);
+    console.log(`[Zip Download] Extracting ${zipName} to ${destDir}...`);
     await new Promise<void>((resolve, reject) => {
       const cmd = `Expand-Archive -Path "${zipPath.replace(/"/g, '`"')}" -DestinationPath "${destDir.replace(/"/g, '`"')}" -Force`;
       const proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { windowsHide: true });

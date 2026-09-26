@@ -5,8 +5,6 @@ import {
   OllamaLLM,
 } from './llm';
 import { config } from '../shared/config';
-import { withProviderFallback } from './provider-fallback';
-
 export class LLMRouter implements LLMProvider {
   public name = 'llm-router';
 
@@ -16,35 +14,25 @@ export class LLMRouter implements LLMProvider {
   ) {}
 
   async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    return withProviderFallback(
-      this.primary,
-      this.local,
-      (p) => p.parseIntent(text, customSystemPrompt),
-      text,
-      {
-        routerName: 'LLM Router',
-        fallbackNotice: 'Automatically failing over to local Ollama model for this turn...',
-        localProviderUsed: 'local-ollama',
-        title: 'pixi Offline Mode',
-        message: 'API rate limit reached. Switched to local model for this turn.',
-      },
-    );
+    if (this.primary) {
+      try {
+        return await this.primary.parseIntent(text, customSystemPrompt);
+      } catch (err) {
+        console.warn(`[LLM Router] Primary (${this.primary.name}) failed parseIntent, falling back to local Ollama:`, err);
+      }
+    }
+    return this.local.parseIntent(text, customSystemPrompt);
   }
 
   async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-    return withProviderFallback(
-      this.primary,
-      this.local,
-      (p) => p.generateCompletion(systemPrompt, userPrompt),
-      userPrompt,
-      {
-        routerName: 'LLM Router',
-        fallbackNotice: 'Automatically failing over to local Ollama model for this turn...',
-        localProviderUsed: 'local-ollama',
-        title: 'pixi Offline Mode',
-        message: 'API rate limit reached. Switched to local model for this turn.',
-      },
-    );
+    if (this.primary) {
+      try {
+        return await this.primary.generateCompletion(systemPrompt, userPrompt);
+      } catch (err) {
+        console.warn(`[LLM Router] Primary (${this.primary.name}) failed generateCompletion, falling back to local Ollama:`, err);
+      }
+    }
+    return this.local.generateCompletion(systemPrompt, userPrompt);
   }
 }
 

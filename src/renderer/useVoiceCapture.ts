@@ -148,7 +148,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions) {
         autoGainControl: true,
       },
     }).then((stream) => {
-      if (isRecordingRef.current || getPhase() !== 'idle') {
+      if (isRecordingRef.current || getPhase() !== 'idle' || !wakeWordEnabled) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }

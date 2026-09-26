@@ -36,7 +36,6 @@ let lastStatusCache: { status: OllamaStatus; timestamp: number } | null = null;
 
 /**
  * Verifies if Ollama executable is installed on the local machine.
- * Caches result and inspects PATH directly in Node without spawning cmd.exe.
  */
 export function isOllamaInstalled(forceCheck = false): OllamaInstallInfo {
   if (cachedInstallInfo && !forceCheck) {
@@ -63,10 +62,8 @@ export function isOllamaInstalled(forceCheck = false): OllamaInstallInfo {
     }
   }
 
-  // Pure JS search across system PATH without launching cmd.exe / where.exe
   const pathEnv = process.env.PATH || '';
-  const pathDirs = pathEnv.split(path.delimiter);
-  for (const dir of pathDirs) {
+  for (const dir of pathEnv.split(path.delimiter)) {
     if (!dir) continue;
     const candidateCli = path.join(dir, 'ollama.exe');
     if (fs.existsSync(candidateCli)) {
@@ -345,6 +342,8 @@ export async function pullLocalModel(
                 if (onProgress) {
                   onProgress(percent, `Downloading ${DEFAULT_LOCAL_MODEL}: ${percent}%`);
                 }
+              } else if (parsed.status && parsed.status !== 'downloading') {
+                if (onProgress) onProgress(currentDownloadProgress, `Ollama: ${parsed.status}`);
               }
             } catch {
               // Skip invalid JSON lines

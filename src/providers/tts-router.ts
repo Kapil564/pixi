@@ -3,8 +3,6 @@ import {
   createPrimaryTTSProvider,
   PiperLocalTTS,
 } from './tts';
-import { withProviderFallback } from './provider-fallback';
-
 export class TTSRouter implements TTSProvider {
   public name = 'tts-router';
 
@@ -14,19 +12,14 @@ export class TTSRouter implements TTSProvider {
   ) {}
 
   async speak(text: string, onStart?: () => void): Promise<void> {
-    return withProviderFallback(
-      this.primary,
-      this.local,
-      (p) => p.speak(text, onStart),
-      text,
-      {
-        routerName: 'TTS Router',
-        fallbackNotice: 'Automatically failing over to local Piper voice model...',
-        localProviderUsed: 'local-piper',
-        title: 'pixi Offline Voice',
-        message: 'API rate limit reached. Switched to offline voice for speech synthesis.',
-      },
-    );
+    if (this.primary) {
+      try {
+        return await this.primary.speak(text, onStart);
+      } catch (err) {
+        console.warn(`[TTS Router] Primary (${this.primary.name}) failed speak, falling back to local Piper:`, err);
+      }
+    }
+    return this.local.speak(text, onStart);
   }
 
   stop(): void {

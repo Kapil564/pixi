@@ -551,9 +551,9 @@
           if (q.includes('architecture')) {
             responseText = "pixi is built with Electron (Main Tray Process), React, TypeScript, and a Node.js orchestrator with pluggable STT/LLM/TTS stages.";
           } else if (q.includes('offline')) {
-            responseText = "Yes! pixi supports 100% offline local execution using faster-whisper, local Ollama models, and Windows SAPI5 / Piper TTS.";
+            responseText = "Yes! pixi supports 100% offline local execution using faster-whisper, local Ollama models, and Piper ONNX TTS.";
           } else if (q.includes('provider')) {
-            responseText = "Supported providers include STT (OpenAI/Groq Whisper, local faster-whisper), LLM (GPT-4o-mini, Gemini, Groq Llama, Ollama), and TTS (Fish, ElevenLabs, Azure, SAPI5).";
+            responseText = "Supported providers include STT (OpenAI Whisper, ElevenLabs Scribe, local faster-whisper), LLM (GPT-4o-mini, Gemini, Ollama), and TTS (Piper, ElevenLabs).";
           }
 
           addMessage('assistant', responseText);

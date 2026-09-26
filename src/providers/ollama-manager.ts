@@ -1,7 +1,7 @@
 import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { isLocalServerReachable, executeWithExponentialBackoff } from '../shared/http-util';
 import { config } from '../shared/config';
 
@@ -19,83 +19,160 @@ export interface OllamaStatus {
   executablePath?: string;
 }
 
+export interface OllamaInstallInfo {
+  installed: boolean;
+  path?: string;
+  appPath?: string;
+}
+
 const DEFAULT_LOCAL_MODEL = process.env.OLLAMA_FALLBACK_MODEL || 'llama3.2:3b';
 
 let currentDownloadProgress = 0;
 let isDownloading = false;
+let cachedInstallInfo: OllamaInstallInfo | null = null;
+let startingServicePromise: Promise<boolean> | null = null;
+let lastStartAttemptTime = 0;
+let lastStatusCache: { status: OllamaStatus; timestamp: number } | null = null;
 
 /**
- * Verifies if the Ollama executable (ollama.exe) is installed on the local machine.
+ * Verifies if Ollama executable is installed on the local machine.
+ * Caches result and inspects PATH directly in Node without spawning cmd.exe.
  */
-export function isOllamaInstalled(): { installed: boolean; path?: string } {
+export function isOllamaInstalled(forceCheck = false): OllamaInstallInfo {
+  if (cachedInstallInfo && !forceCheck) {
+    return cachedInstallInfo;
+  }
+
   const localAppData = process.env.LOCALAPPDATA || '';
   const programFiles = process.env.ProgramFiles || '';
-  const possiblePaths = [
-    path.join(localAppData, 'Programs', 'Ollama', 'ollama.exe'),
-    path.join(programFiles, 'Ollama', 'ollama.exe'),
+  const possibleDirs = [
+    path.join(localAppData, 'Programs', 'Ollama'),
+    path.join(programFiles, 'Ollama'),
   ];
 
-  for (const execPath of possiblePaths) {
-    if (fs.existsSync(execPath)) {
-      return { installed: true, path: execPath };
+  for (const dir of possibleDirs) {
+    const cliPath = path.join(dir, 'ollama.exe');
+    const appPath = path.join(dir, 'ollama app.exe');
+    if (fs.existsSync(cliPath)) {
+      cachedInstallInfo = {
+        installed: true,
+        path: cliPath,
+        appPath: fs.existsSync(appPath) ? appPath : undefined,
+      };
+      return cachedInstallInfo;
     }
   }
 
-  // Check via system PATH on Windows
-  try {
-    const stdout = execSync('where ollama', { encoding: 'utf-8', windowsHide: true });
-    if (stdout && stdout.trim()) {
-      const firstLine = stdout.split(/\r?\n/)[0].trim();
-      if (firstLine && fs.existsSync(firstLine)) {
-        return { installed: true, path: firstLine };
-      }
+  // Pure JS search across system PATH without launching cmd.exe / where.exe
+  const pathEnv = process.env.PATH || '';
+  const pathDirs = pathEnv.split(path.delimiter);
+  for (const dir of pathDirs) {
+    if (!dir) continue;
+    const candidateCli = path.join(dir, 'ollama.exe');
+    if (fs.existsSync(candidateCli)) {
+      const candidateApp = path.join(dir, 'ollama app.exe');
+      cachedInstallInfo = {
+        installed: true,
+        path: candidateCli,
+        appPath: fs.existsSync(candidateApp) ? candidateApp : undefined,
+      };
+      return cachedInstallInfo;
     }
-  } catch {
-    // ignore lookup error if not on PATH
   }
 
-  return { installed: false };
+  cachedInstallInfo = { installed: false };
+  return cachedInstallInfo;
 }
 
 /**
- * Attempts to auto-start the local Ollama background service if installed on the Windows machine.
+ * Attempts to auto-start the local Ollama background service if installed.
+ * Prevents multiple concurrent spawns and avoids console/terminal window flash.
  */
 export async function tryStartOllamaService(): Promise<boolean> {
-  const baseUrl = config.llm.baseUrl || 'http://localhost:11434';
-  if (await isLocalServerReachable(`${baseUrl}/api/tags`)) {
-    return true;
+  if (startingServicePromise) {
+    return startingServicePromise;
   }
 
-  const installCheck = isOllamaInstalled();
-  if (!installCheck.installed) {
-    console.warn('[Ollama Service] Cannot auto-start: Ollama executable is not installed on this machine.');
+  const now = Date.now();
+  // Cooldown: do not re-attempt if last attempt failed within 10 seconds
+  if (now - lastStartAttemptTime < 10000) {
     return false;
   }
 
-  const execPath = installCheck.path || 'ollama';
+  startingServicePromise = (async () => {
+    lastStartAttemptTime = Date.now();
+    const baseUrl = config.llm.baseUrl || 'http://localhost:11434';
+    if (await isLocalServerReachable(`${baseUrl}/api/tags`, 1500)) {
+      return true;
+    }
+
+    const installCheck = isOllamaInstalled();
+    if (!installCheck.installed) {
+      console.warn('[Ollama Service] Cannot auto-start: Ollama executable is not installed on this machine.');
+      return false;
+    }
+
+    try {
+      // 1. Prefer the official Windows GUI tray app ("ollama app.exe")
+      // It has SUBSYSTEM_WINDOWS (GUI), so Windows Terminal NEVER opens a tab or console window.
+      if (installCheck.appPath && fs.existsSync(installCheck.appPath)) {
+        console.log(`[Ollama Service] Launching Ollama Windows GUI service at "${installCheck.appPath}"...`);
+        const child = spawn(installCheck.appPath, [], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        child.unref();
+      } else if (process.platform === 'win32') {
+        // 2. If only "ollama.exe" is present on Windows, launch via WScript.Shell with style 0 (hidden)
+        // to prevent Windows 11 Windows Terminal from opening and closing a console tab.
+        const execPath = installCheck.path || 'ollama.exe';
+        console.log(`[Ollama Service] Launching headless Ollama CLI service via hidden host at "${execPath}"...`);
+        const tempVbs = path.join(os.tmpdir(), `launch_ollama_${Date.now()}.vbs`);
+        const vbsContent = `CreateObject("Wscript.Shell").Run chr(34) & "${execPath.replace(/\\/g, '\\\\')}" & chr(34) & " serve", 0, False\n`;
+        fs.writeFileSync(tempVbs, vbsContent, 'utf-8');
+        const child = spawn('wscript.exe', [tempVbs], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        child.unref();
+        setTimeout(() => {
+          try {
+            if (fs.existsSync(tempVbs)) fs.unlinkSync(tempVbs);
+          } catch {}
+        }, 10000);
+      } else {
+        // 3. Fallback for non-Windows platforms
+        const execPath = installCheck.path || 'ollama';
+        console.log(`[Ollama Service] Auto-starting Ollama service at "${execPath}"...`);
+        const child = spawn(execPath, ['serve'], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        child.unref();
+      }
+
+      // Poll port 11434 for up to 8 seconds (16 attempts * 500ms) to confirm readiness
+      for (let i = 0; i < 16; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (await isLocalServerReachable(`${baseUrl}/api/tags`, 1000)) {
+          console.log('[Ollama Service] Successfully verified and started Ollama service on port 11434.');
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error('[Ollama Service Error] Failed to launch Ollama executable:', err);
+    }
+
+    return false;
+  })();
 
   try {
-    console.log(`[Ollama Service] Verified Ollama installation at "${execPath}". Auto-starting service...`);
-    const child = spawn(execPath, ['serve'], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.unref();
-
-    // Poll port 11434 for up to 3 seconds to confirm readiness
-    for (let i = 0; i < 6; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      if (await isLocalServerReachable(`${baseUrl}/api/tags`)) {
-        console.log('[Ollama Service] Successfully verified and started Ollama service on port 11434.');
-        return true;
-      }
-    }
-  } catch (err) {
-    console.error('[Ollama Service Error] Failed to launch Ollama executable:', err);
+    return await startingServicePromise;
+  } finally {
+    startingServicePromise = null;
   }
-
-  return false;
 }
 
 /**
@@ -119,18 +196,22 @@ export function checkSystemRam() {
  * Retrieves current Ollama runtime status, installation verification, RAM specs, and model availability.
  */
 export async function getOllamaStatus(): Promise<OllamaStatus> {
+  const now = Date.now();
+  if (lastStatusCache && now - lastStatusCache.timestamp < 2000 && !lastStatusCache.status.downloading) {
+    return lastStatusCache.status;
+  }
+
   const ramInfo = checkSystemRam();
   const installCheck = isOllamaInstalled();
   const baseUrl = config.llm.baseUrl || 'http://localhost:11434';
-  let running = await isLocalServerReachable(`${baseUrl}/api/tags`);
+  let running = await isLocalServerReachable(`${baseUrl}/api/tags`, 1500);
 
   if (!running && installCheck.installed) {
-    // Attempt auto-starting the verified Ollama background service
     running = await tryStartOllamaService();
   }
 
   if (!running) {
-    return {
+    const result: OllamaStatus = {
       installed: installCheck.installed,
       running: false,
       modelName: DEFAULT_LOCAL_MODEL,
@@ -143,6 +224,8 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
       executablePath: installCheck.path,
       ...ramInfo,
     };
+    lastStatusCache = { status: result, timestamp: now };
+    return result;
   }
 
   let modelDownloaded = false;
@@ -169,7 +252,7 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
     statusText = `Model ${DEFAULT_LOCAL_MODEL} not downloaded yet.`;
   }
 
-  return {
+  const result: OllamaStatus = {
     installed: true,
     running: true,
     modelName: DEFAULT_LOCAL_MODEL,
@@ -180,6 +263,8 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
     executablePath: installCheck.path,
     ...ramInfo,
   };
+  lastStatusCache = { status: result, timestamp: now };
+  return result;
 }
 
 /**
@@ -289,22 +374,5 @@ export async function pullLocalModel(
     console.error('[Ollama Pull Exception]:', err);
     isDownloading = false;
     return false;
-  }
-}
-
-/**
- * Auto-checks and ensures local model readiness on app startup.
- */
-export async function ensureLocalModelReady(): Promise<void> {
-  const status = await getOllamaStatus();
-  if (status.running && !status.modelDownloaded && !status.downloading) {
-    console.log('[Ollama Init] Auto-triggering first-run model pull for fallback readiness...');
-    pullLocalModel((percent) => {
-      if (percent % 25 === 0) {
-        console.log(`[Ollama Model Download Progress]: ${percent}%`);
-      }
-    }).catch((err) => {
-      console.error('[Ollama Model Download Error]:', err);
-    });
   }
 }

@@ -26,6 +26,18 @@ contextBridge.exposeInMainWorld('assistant', {
   getOllamaStatus: () => ipcRenderer.invoke('ollama:status'),
   pullOllamaModel: () => ipcRenderer.invoke('ollama:pull'),
   getSetupStatus: () => ipcRenderer.invoke('setup:status'),
+  refreshReadiness: () => ipcRenderer.invoke('readiness:refresh'),
+  onPipelineReadiness: (cb: (data: {
+    ready: boolean;
+    currentStage: string | null;
+    nextBlocker: string | null;
+    overallProgress: number;
+    stages?: { stage: string; ready: boolean; progress: number; statusText: string; label: string }[];
+  }) => void) =>
+    safeOn('pipeline:readiness', cb),
+  offPipelineReadiness: () => {
+    ipcRenderer.removeAllListeners('pipeline:readiness');
+  },
   runSetupSequence: () => ipcRenderer.invoke('setup:run'),
   retrySetup: () => ipcRenderer.invoke('setup:retry'),
   getSetupLogs: () => ipcRenderer.invoke('setup:logs'),

@@ -17,5 +17,3 @@ export interface AssistantResponse {
   display?: string;
   intent?: string;
 }
-
-export type TTSProvider = 'fishaudio' | 'elevenlabs' | 'piper' | 'azure' | 'cloudflare';

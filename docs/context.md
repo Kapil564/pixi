@@ -9,8 +9,8 @@ Welcome to the internal technical documentation for **pixi**, a privacy-first, S
 pixi is designed to bridge the gap between cloud-based AI convenience and 100% offline, local-first privacy. It functions as a native Windows desktop assistant operating silently in the System Tray with frameless, transparent overlay windows.
 
 ### Core Philosophy
-* **Zero Mandated Cloud Lock-in:** pixi operates out-of-the-box using local models (Ollama, local Whisper, and Windows SAPI5 / Piper TTS) without requiring any API keys.
-* **Smart Provider Fallback Matrix:** If API keys for cloud providers (OpenAI, Gemini, Groq, Fish Audio, ElevenLabs) are supplied in `.env`, pixi uses them. If an API key is missing or fails, pixi automatically falls back to local or free engines without crashing.
+* **Zero Mandated Cloud Lock-in:** pixi operates out-of-the-box using local models (Ollama, local Whisper, and Piper TTS) without requiring any API keys.
+* **Smart Provider Fallback Matrix:** If API keys for cloud providers (OpenAI, Gemini, ElevenLabs) are supplied in `.env`, pixi uses them. If an API key is missing or fails, pixi automatically falls back to local or free engines without crashing.
 * **Per-User Local Data Isolation:** Transcripts, reminders, to-dos, and long-term memory files stay strictly on disk inside `%APPDATA%\pixi\`. There is no central server, remote telemetry tracking, or cloud database synchronization.
 
 ---
@@ -18,7 +18,7 @@ pixi is designed to bridge the gap between cloud-based AI convenience and 100% o
 ## 2. Directory & Repository Structure
 
 ```
-pixi-assistant/
+pixi/
 ├── .env                       # Local environment variables and API keys
 ├── .env.example               # Template environment configuration
 ├── drizzle.config.ts          # Drizzle ORM configuration for SQLite
@@ -51,14 +51,14 @@ pixi-assistant/
     │   ├── index.ts           # Socket.io server pipeline, VAD handler, request cancellation & lock logic
     │   └── scheduler.ts        # Node-cron background reminder polling & notification trigger
     ├── providers/             # Pluggable AI Service Providers
-    │   ├── llm.ts             # OpenAI, Gemini, Groq, & Ollama intent parsing implementations
+    │   ├── llm.ts             # OpenAI, Gemini, & Ollama intent parsing implementations
     │   ├── llm-router.ts      # LLM provider fallback routing logic
     │   ├── ollama-manager.ts  # Ollama server health check & model downloader (`pullLocalModel`)
     │   ├── piper-manager.ts   # Piper TTS binary & voice model downloader
     │   ├── setup-manager.ts   # 3-step unified background setup sequence manager
-    │   ├── stt.ts             # OpenAI, Groq, & local faster-whisper STT implementations
+    │   ├── stt.ts             # OpenAI, ElevenLabs, & local faster-whisper STT implementations
     │   ├── stt-router.ts      # STT provider fallback routing logic
-    │   ├── tts.ts             # Windows SAPI5, Piper, Fish Audio, ElevenLabs, & Azure TTS
+    │   ├── tts.ts             # Piper & ElevenLabs TTS
     │   ├── tts-router.ts      # TTS provider fallback routing logic
     │   └── whisper-manager.ts # Whisper CLI binary & model downloader
     ├── renderer/              # Frontend UI (React + Tailwind CSS)
@@ -115,17 +115,16 @@ pixi evaluates available environment variables at startup and dynamically routes
 
 ### Speech-to-Text (STT) Router
 1. **OpenAI Whisper API:** Selected if `STT_PROVIDER=openai` and `OPENAI_API_KEY` is present.
-2. **Groq Whisper:** Selected if `STT_PROVIDER=groq` and `GROQ_API_KEY` is present.
+2. **ElevenLabs Scribe:** Selected if `STT_PROVIDER=elevenlabs` and `ELEVENLABS_API_KEY` is present.
 3. **Local faster-whisper (Fallback):** Selected if no STT key is configured. Pings `OFFLINE_STT_URL` (default `http://localhost:8000`). If unreachable, falls back to the local downloaded `whisper-cli.exe` binary.
 
 ### Intent Parsing & Language Models (LLM) Router
-1. **Cloud Providers:** Routes to OpenAI (`gpt-4o-mini`), Google Gemini (`gemini-1.5-flash`), or Groq (`llama-3.3-70b-versatile`) if configured in `.env`.
+1. **Cloud Providers:** Routes to OpenAI (`gpt-4o-mini`), Google Gemini (`gemini-1.5-flash`), or Ollama if configured in `.env`.
 2. **Local Ollama (Fallback):** Routes to local Ollama instance (`llama3.2` or user model) at `OLLAMA_BASE_URL` (`http://localhost:11434`).
 
 ### Text-to-Speech (TTS) Router
-1. **Cloud Providers:** Routes to Fish Audio, ElevenLabs, or Azure Speech if corresponding API keys are set.
-2. **Local Piper TTS:** Selected if local `piper.exe` binary and voice model are downloaded.
-3. **Windows SAPI5 (Universal Fallback):** Executes native PowerShell `$sp.Speak()` commands using Windows built-in SAPI5 voices. Ensures pixi never breaks even without internet or cloud keys.
+1. **Cloud Providers:** Routes to ElevenLabs if `TTS_PROVIDER=elevenlabs` and `ELEVENLABS_API_KEY` is set. If missing or failing, falls back to local Piper TTS.
+2. **Local Piper TTS (Fallback):** Selected if running offline or without cloud TTS keys. Synthesizes neural speech using local `piper.exe` binary and downloaded ONNX voice models.
 
 ---
 
@@ -144,7 +143,7 @@ Handling real-time voice interactions introduces significant race conditions:
 
    const cancelActivePipeline = () => {
      activeRequestId++;
-     tts.stop(); // Immediately kills active SAPI5 / Piper processes
+     tts.stop(); // Immediately kills active Piper / ElevenLabs processes
    };
    ```
 2. **Atomic Step Verification:** Every async phase (STT, LLM, Action Execution, TTS) checks `if (currentReqId !== activeRequestId) return;`. If a user speaks or submits text, all previous pending pipeline executions abort immediately.
@@ -185,7 +184,7 @@ Progress is logged non-blockingly and can be queried via IPC handle `setup:statu
    - Offline local VAD monitors microphone volume spikes (warmup filtering + sustained vocal energy threshold).
    - Alternatively, continuous Web Speech API listens for wake words (`"Hey pixi"`, `"pixi"`).
    - Upon wake word detection, a wake chime plays, status updates to `🎙 Listening...`, and PCM audio recording starts.
-   - 4 seconds of silence triggers automatic audio submission.
+   - 2 seconds of silence triggers automatic audio submission.
 4. **Mode Switching:**
    - Click the mode switcher icon to toggle between **Floating Pixel Blob Mascot Orb** (100x100 transparent overlay) and **Catppuccin Windows 11 Widget Bar** (580x60 horizontal command bar).
 
@@ -224,7 +223,7 @@ For every user message, pixi assembles a turn context:
 | **Database** | `better-sqlite3` (^11.0.0) + `drizzle-orm` (^0.31.0) | Local high-performance relational storage |
 | **Audio Capture** | `node-record-lpcm16` (^1.0.1) & Web Audio API | Microphone PCM stream capture |
 | **Scheduling** | `node-cron` (^3.0.3) + `node-notifier` (^10.0.1) | Reminder triggers & native Windows notifications |
-| **AI SDKs** | `@google/generative-ai`, `openai`, `groq-sdk`, `fish-audio` | Provider API clients |
+| **AI SDKs** | `@google/generative-ai`, `openai` | Provider API clients |
 | **Bundling & Build** | `tsup` (^8.0.0), `tsx`, `electron-builder` (^24.13.0) | TypeScript compilation and NSIS/Portable packaging |
 
 ---

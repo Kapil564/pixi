@@ -1,11 +1,16 @@
 import { config } from '../shared/config';
-import { isLocalServerReachable } from '../shared/http-util';
+import { assertOk } from '../shared/http-util';
 import type { IntentResult } from '../shared/types';
 
 export interface LLMProvider {
   name: string;
   parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult>;
   generateCompletion(systemPrompt: string, userPrompt: string): Promise<string>;
+}
+
+interface ChatMessage {
+  role: string;
+  content: string;
 }
 
 export function getSystemPrompt(customContext?: string): string {
@@ -75,144 +80,70 @@ function parseContentToIntent(content: unknown): IntentResult {
   return { intent, params } as IntentResult;
 }
 
-export class OpenAiLLM implements LLMProvider {
-  public name = 'openai';
+export class OpenAICompatibleLLM implements LLMProvider {
+  public name: string;
+  private baseUrl: string;
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model: string) {
+  constructor(baseUrl: string, apiKey: string, model: string, name = 'openai') {
+    this.baseUrl = baseUrl;
     this.apiKey = apiKey;
     this.model = model;
+    this.name = name;
+  }
+
+  private authHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this.apiKey}`,
+    };
+  }
+
+  private async chat(
+    messages: ChatMessage[],
+    temperature: number,
+    label: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<any> {
+    if (!this.apiKey) throw new Error(`${this.name} API key is missing.`);
+
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify({ model: this.model, messages, temperature, ...extra }),
+    });
+
+    await assertOk(res, `${this.name} ${label}`);
+    return res.json();
   }
 
   async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    if (!this.apiKey) throw new Error('OpenAI API key is missing.');
-
     const sysPrompt = getSystemPrompt(customSystemPrompt);
+    const data = await this.chat(
+      [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: text },
+      ],
+      0.2,
+      'LLM',
+      { response_format: { type: 'json_object' } },
+    );
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: text },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI LLM failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     return parseContentToIntent(content);
   }
 
   async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-    if (!this.apiKey) throw new Error('OpenAI API key is missing.');
+    const data = await this.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      0.3,
+      'completion',
+    );
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI completion failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
-  }
-}
-
-export class GroqLLM implements LLMProvider {
-  public name = 'groq';
-  private apiKey: string;
-  private model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.apiKey = apiKey;
-    this.model = model || 'llama3-8b-8192';
-  }
-
-  async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    if (!this.apiKey) throw new Error('Groq API key is missing.');
-
-    const sysPrompt = getSystemPrompt(customSystemPrompt);
-
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: text },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq LLM failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    return parseContentToIntent(content);
-  }
-
-  async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-    if (!this.apiKey) throw new Error('Groq API key is missing.');
-
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq completion failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
     return data.choices?.[0]?.message?.content || '';
   }
 }
@@ -227,40 +158,19 @@ export class GeminiLLM implements LLMProvider {
     this.model = model || 'gemini-1.5-flash';
   }
 
-  async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    if (!this.apiKey) throw new Error('Gemini API key is missing.');
-
-    const sysPrompt = getSystemPrompt(customSystemPrompt);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          { role: 'user', parts: [{ text: sysPrompt }] },
-          { role: 'user', parts: [{ text }] },
-        ],
-        generationConfig: { temperature: 0.2 },
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini LLM failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return parseContentToIntent(content);
+  private get url() {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
   }
 
-  async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+  private async generateContent(
+    systemPrompt: string,
+    userPrompt: string,
+    temperature: number,
+    label: string,
+  ): Promise<string> {
     if (!this.apiKey) throw new Error('Gemini API key is missing.');
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
-
-    const response = await fetch(url, {
+    const res = await fetch(this.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -268,17 +178,24 @@ export class GeminiLLM implements LLMProvider {
           { role: 'user', parts: [{ text: systemPrompt }] },
           { role: 'user', parts: [{ text: userPrompt }] },
         ],
-        generationConfig: { temperature: 0.3 },
+        generationConfig: { temperature },
       }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini completion failed (${response.status}): ${errText || response.statusText}`);
-    }
+    await assertOk(res, `Gemini ${label}`);
 
-    const data = await response.json();
+    const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
+    const sysPrompt = getSystemPrompt(customSystemPrompt);
+    const content = await this.generateContent(sysPrompt, text, 0.2, 'LLM');
+    return parseContentToIntent(content);
+  }
+
+  async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.generateContent(systemPrompt, userPrompt, 0.3, 'completion');
   }
 }
 
@@ -292,183 +209,31 @@ export class OllamaLLM implements LLMProvider {
     this.model = model || 'llama3.2:3b';
   }
 
-  async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    const sysPrompt = getSystemPrompt(customSystemPrompt);
-    const response = await fetch(`${this.baseUrl}/api/generate`, {
+  private async generate(
+    prompt: string,
+    label: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<string> {
+    const res = await fetch(`${this.baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        prompt: `${sysPrompt}\n\nUser: ${text}\n\nIntent JSON:`,
-        stream: false,
-        format: 'json',
-      }),
+      body: JSON.stringify({ model: this.model, prompt, stream: false, ...extra }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Ollama LLM failed (${response.status}): ${errText || response.statusText}`);
-    }
+    await assertOk(res, `Ollama ${label}`);
 
-    const data = await response.json();
-    const content = data.response;
-    return parseContentToIntent(content);
-  }
-
-  async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-    const response = await fetch(`${this.baseUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        prompt: `${systemPrompt}\n\n${userPrompt}`,
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Ollama completion failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
+    const data = await res.json();
     return data.response || '';
   }
-}
-
-export class CloudflareLLM implements LLMProvider {
-  public name = 'cloudflare';
-  private accountId: string;
-  private apiToken: string;
-  private gatewayId: string;
-  private model: string;
-
-  constructor(accountId: string, apiToken: string, gatewayId = '', model = '@cf/meta/llama-3.1-8b-instruct') {
-    this.accountId = accountId;
-    this.apiToken = apiToken;
-    this.gatewayId = gatewayId;
-    this.model = model;
-  }
 
   async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
-    if (!this.apiToken) throw new Error('Cloudflare API Token is missing.');
-
     const sysPrompt = getSystemPrompt(customSystemPrompt);
-
-    if (this.gatewayId && this.accountId) {
-      const response = await fetch(
-        `https://gateway.ai.cloudflare.com/v1/${this.accountId}/${this.gatewayId}/openai/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiToken}`,
-          },
-          body: JSON.stringify({
-            model: this.model || 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: sysPrompt },
-              { role: 'user', content: text },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.2,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Cloudflare AI Gateway LLM failed (${response.status}): ${errText || response.statusText}`);
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-      return parseContentToIntent(content);
-    }
-
-    if (!this.accountId) throw new Error('Cloudflare Account ID is missing.');
-
-    const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/ai/run/${this.model}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiToken}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: text },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Cloudflare Workers AI LLM failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.result?.response ?? data.result ?? data.response;
+    const content = await this.generate(`${sysPrompt}\n\nUser: ${text}\n\nIntent JSON:`, 'LLM', { format: 'json' });
     return parseContentToIntent(content);
   }
 
   async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-    if (!this.apiToken) throw new Error('Cloudflare API Token is missing.');
-
-    if (this.gatewayId && this.accountId) {
-      const response = await fetch(
-        `https://gateway.ai.cloudflare.com/v1/${this.accountId}/${this.gatewayId}/openai/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiToken}`,
-          },
-          body: JSON.stringify({
-            model: this.model || 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.3,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Cloudflare AI Gateway completion failed (${response.status}): ${errText || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
-    }
-
-    if (!this.accountId) throw new Error('Cloudflare Account ID is missing.');
-
-    const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/ai/run/${this.model}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiToken}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: systemPrompt ? userPrompt : '' },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Cloudflare Workers AI completion failed (${response.status}): ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.result?.response ?? data.result ?? data.response ?? '';
+    return this.generate(`${systemPrompt}\n\n${userPrompt}`, 'completion');
   }
 }
 
@@ -476,42 +241,16 @@ export function createPrimaryLLMProvider(): LLMProvider | null {
   const provider = config.llm.provider;
 
   switch (provider) {
-    case 'cloudflare':
-      if (config.cloudflare.apiToken && config.cloudflare.accountId) {
-        return new CloudflareLLM(
-          config.cloudflare.accountId,
-          config.cloudflare.apiToken,
-          config.cloudflare.gatewayId,
-          config.cloudflare.llmModel,
-        );
-      }
-      console.warn('[LLM] Provider forced to cloudflare but CLOUDFLARE_API_TOKEN or ACCOUNT_ID missing.');
-      return null;
     case 'gemini':
       if (config.llm.geminiKey) return new GeminiLLM(config.llm.geminiKey, config.llm.model);
       console.warn('[LLM] Provider forced to gemini but GEMINI_API_KEY missing.');
       return null;
-    case 'groq':
-      if (config.llm.groqKey) return new GroqLLM(config.llm.groqKey, config.llm.model);
-      console.warn('[LLM] Provider forced to groq but GROQ_API_KEY missing.');
-      return null;
     case 'openai':
-      if (config.llm.openAiKey) return new OpenAiLLM(config.llm.openAiKey, config.llm.model);
+      if (config.llm.openAiKey) return new OpenAICompatibleLLM('https://api.openai.com/v1', config.llm.openAiKey, config.llm.model, 'openai');
       console.warn('[LLM] Provider forced to openai but OPENAI_API_KEY missing.');
       return null;
     case 'ollama':
     default:
       return null;
   }
-}
-
-/**
- * Creates the configured cloud LLM provider, falling back to local Ollama
- * when no matching provider key exists. Use this if you need a single LLMProvider
- * directly rather than the LLMRouter.
- */
-export async function createLLMProvider(): Promise<LLMProvider> {
-  const primary = createPrimaryLLMProvider();
-  if (primary) return primary;
-  return new OllamaLLM(config.llm.baseUrl, config.llm.model);
 }

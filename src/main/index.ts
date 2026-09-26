@@ -55,6 +55,20 @@ function positionTopLeft() {
   }
 }
 
+function positionCenter() {
+  if (!window) return;
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight, x: workX, y: workY } = primaryDisplay.workArea;
+    const [winWidth, winHeight] = window.getSize();
+    const x = Math.round(workX + (screenWidth - winWidth) / 2);
+    const y = Math.round(workY + (screenHeight - winHeight) / 2);
+    window.setPosition(x, y);
+  } catch (err) {
+    console.error('[Main] Failed to center window:', err);
+  }
+}
+
 function isAutostartEnabled(): boolean {
   try {
     return app.getLoginItemSettings().openAtLogin;
@@ -106,8 +120,8 @@ function updateTrayMenu() {
 function createWindow() {
   const settings = getSettings();
   const isFirstRun = !settings.onboardingCompleted;
-  const initialWidth = isFirstRun ? 600 : 100;
-  const initialHeight = isFirstRun ? 640 : 100;
+  const initialWidth = isFirstRun ? 620 : 100;
+  const initialHeight = isFirstRun ? 560 : 100;
 
   window = new BrowserWindow({
     width: initialWidth,
@@ -126,7 +140,11 @@ function createWindow() {
     },
   });
 
-  positionTopLeft();
+  if (isFirstRun) {
+    positionCenter();
+  } else {
+    positionTopLeft();
+  }
   window.loadFile(path.join(__dirname, '../../index.html'));
 
   window.webContents.on('console-message', (_event, _level, message) => {
@@ -223,7 +241,7 @@ let socket: Socket | null = null;
 
 function getSocket(): Socket {
   if (!socket) {
-    socket = io(`http://localhost:${config.server.port}`);
+    socket = io(`http://127.0.0.1:${config.server.port}`);
 
     socket.on('connect', () => {
       console.log('[Main Socket Bridge] Connected to Orchestrator on port', config.server.port);
@@ -269,15 +287,19 @@ ipcMain.on('hide-window', () => {
 
 ipcMain.on('resize-to-orb', () => {
   if (window) {
-    // Do NOT call positionTopLeft() here — preserve user's current window position
+    window.setResizable(true);
     window.setSize(100, 100, true);
+    window.setResizable(false);
+    positionTopLeft();
   }
 });
 
 ipcMain.on('resize-to-onboarding', () => {
   if (window) {
-    window.setSize(600, 640, true);
-    positionTopLeft();
+    window.setResizable(true);
+    window.setSize(620, 560, true);
+    window.setResizable(false);
+    positionCenter();
   }
 });
 
@@ -314,6 +336,7 @@ ipcMain.on('stop-speech', () => {
 
 import { getOllamaStatus, pullLocalModel } from '../providers/ollama-manager';
 import { getFullSetupStatus, runFullSetupSequence, clearLastError, getSetupLogs, getLastError } from '../providers/setup-manager';
+import { refreshPipelineReadiness, onReadinessChange } from '../providers/readiness';
 import { setSelectedModelName, downloadWhisperModel } from '../providers/whisper-manager';
 import { setSelectedVoiceName, downloadPiperVoice } from '../providers/piper-manager';
 import { getDatabaseStatus } from '../db';
@@ -340,6 +363,30 @@ ipcMain.handle('setup:status', async () => {
   return await getFullSetupStatus();
 });
 
+ipcMain.handle('readiness:refresh', async () => {
+  return await refreshPipelineReadiness(true);
+});
+
+// Push ordered-pipeline readiness (STT -> LLM -> TTS) to the renderer whenever
+// the ready state flips OR per-stage progress changes, so the UI gates the
+// mic/text input in lockstep with the orchestrator's backend gate and can
+// render a live stage checklist.
+onReadinessChange((readiness) => {
+  window?.webContents.send('pipeline:readiness', {
+    ready: readiness.ready,
+    currentStage: readiness.currentStage,
+    nextBlocker: readiness.nextBlocker,
+    overallProgress: readiness.overallProgress,
+    stages: readiness.stages.map((s) => ({
+      stage: s.stage,
+      ready: s.ready,
+      progress: s.progress,
+      statusText: s.statusText,
+      label: s.label,
+    })),
+  });
+});
+
 ipcMain.handle('setup:logs', () => {
   return getSetupLogs();
 });
@@ -362,25 +409,21 @@ ipcMain.handle('sys:status', () => {
 
 import { logErrorToFile } from '../shared/error-logger';
 
-ipcMain.handle('setup:run', async () => {
+const runSetupSequence = async (context: 'SetupRun' | 'SetupRetry') => {
   const success = await runFullSetupSequence((progress, text) => {
     window?.webContents.send('setup:progress', { progress, text });
   });
   if (!success) {
-    logErrorToFile(getLastError() || 'Setup sequence failed to complete.', 'SetupRun');
+    logErrorToFile(getLastError() || 'Setup sequence failed to complete.', context);
   }
   return success;
-});
+};
 
-ipcMain.handle('setup:retry', async () => {
+ipcMain.handle('setup:run', () => runSetupSequence('SetupRun'));
+
+ipcMain.handle('setup:retry', () => {
   clearLastError();
-  const success = await runFullSetupSequence((progress, text) => {
-    window?.webContents.send('setup:progress', { progress, text });
-  });
-  if (!success) {
-    logErrorToFile(getLastError() || 'Setup sequence failed to complete.', 'SetupRetry');
-  }
-  return success;
+  return runSetupSequence('SetupRetry');
 });
 
 ipcMain.handle('stt:set-model', async (_event, modelName: string) => {

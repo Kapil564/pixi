@@ -22,9 +22,9 @@ built with **Electron, React, TypeScript, and SQLite**.
 **What's been built:**
 - A modular, local-first assistant architecture with a central orchestrator.
 - Pluggable STT / LLM / TTS providers with automatic fallback:
-  - **STT:** OpenAI Whisper, Groq Whisper, local faster-whisper
-  - **LLM:** OpenAI GPT-4o-mini, Gemini Flash, Groq Llama, local Ollama
-  - **TTS:** Fish Audio, ElevenLabs, Azure, Windows SAPI5 / Piper
+  - **STT:** OpenAI Whisper, ElevenLabs Scribe, local faster-whisper
+  - **LLM:** OpenAI GPT-4o-mini, Gemini Flash, local Ollama
+  - **TTS:** Local Piper ONNX, ElevenLabs
   - All three stages support **100% offline** operation.
 - Dynamic continuous voice activity detection (VAD).
 - Long-term memory: per-user SQLite (`%APPDATA%\pixi\assistant.db`) +
@@ -49,9 +49,9 @@ Electron Tray App (Main Process)
   └── Transparent Frameless Overlay (Widget / Mascot)
         ↕ Socket.io IPC
 Node.js Orchestrator & Task Scheduler
-  ├── Pluggable STT  ──> OpenAI Whisper · Groq Whisper · Local faster-whisper
-  ├── Pluggable LLM  ──> GPT-4o-mini · Gemini Flash · Groq Llama · Local Ollama
-  ├── Pluggable TTS  ──> Fish Audio · ElevenLabs · Azure · SAPI5 / Piper
+  ├── Pluggable STT  ──> OpenAI Whisper · ElevenLabs Scribe · Local faster-whisper
+  ├── Pluggable LLM  ──> GPT-4o-mini · Gemini Flash · Local Ollama
+  ├── Pluggable TTS  ──> Local Piper ONNX · ElevenLabs
   └── Local Storage  ──> SQLite (assistant.db) + Markdown memory
 ```
 

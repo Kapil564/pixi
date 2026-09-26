@@ -1,11 +1,9 @@
-import notifier from 'node-notifier';
 import {
   type TTSProvider,
   createPrimaryTTSProvider,
   PiperLocalTTS,
 } from './tts';
-import { isRateLimitOrQuotaError } from './llm-router';
-import { logProviderUsage } from '../shared/provider-logger';
+import { withProviderFallback } from './provider-fallback';
 
 export class TTSRouter implements TTSProvider {
   public name = 'tts-router';
@@ -16,51 +14,19 @@ export class TTSRouter implements TTSProvider {
   ) {}
 
   async speak(text: string, onStart?: () => void): Promise<void> {
-    if (this.primary) {
-      try {
-        await this.primary.speak(text, onStart);
-        logProviderUsage({
-          turnPrompt: text,
-          providerUsed: this.primary.name,
-          fallbackOccurred: false,
-        });
-        return;
-      } catch (err) {
-        if (isRateLimitOrQuotaError(err)) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          console.warn(`[TTS Router] Primary provider (${this.primary.name}) rate limit/quota reached: ${errMsg}`);
-          console.warn('[TTS Router] Automatically failing over to local Piper voice model...');
-
-          // OS notification
-          notifier.notify({
-            title: 'pixi Offline Voice',
-            message: 'API rate limit reached. Switched to offline voice for speech synthesis.',
-            sound: false,
-          });
-
-          // Private local logging
-          logProviderUsage({
-            turnPrompt: text,
-            providerUsed: 'local-piper',
-            fallbackOccurred: true,
-            reason: 'quota_exceeded',
-            errorDetails: errMsg,
-          });
-
-          return await this.local.speak(text, onStart);
-        }
-
-        // Rethrow non-quota errors (auth/network/401) so they surface properly
-        throw err;
-      }
-    }
-
-    logProviderUsage({
-      turnPrompt: text,
-      providerUsed: 'local-piper',
-      fallbackOccurred: false,
-    });
-    return await this.local.speak(text, onStart);
+    return withProviderFallback(
+      this.primary,
+      this.local,
+      (p) => p.speak(text, onStart),
+      text,
+      {
+        routerName: 'TTS Router',
+        fallbackNotice: 'Automatically failing over to local Piper voice model...',
+        localProviderUsed: 'local-piper',
+        title: 'pixi Offline Voice',
+        message: 'API rate limit reached. Switched to offline voice for speech synthesis.',
+      },
+    );
   }
 
   stop(): void {
@@ -72,7 +38,7 @@ export class TTSRouter implements TTSProvider {
 }
 
 /**
- * Creates the TTSRouter with explicit primary provider priority (Fish Audio > ElevenLabs > Azure > Cloudflare)
+ * Creates the TTSRouter with explicit primary provider priority (ElevenLabs)
  * and local Piper TTS fallback.
  */
 export function createTTSRouter(): TTSProvider {

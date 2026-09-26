@@ -2,6 +2,7 @@ import notifier from 'node-notifier';
 import { db } from '../db';
 import { getDueReminders, markReminderNotified } from '../db/actions';
 import type { TTSProvider } from '../providers/tts';
+import { isPipelineReady } from '../providers/readiness';
 
 let isChecking = false;
 let pollingIntervalId: NodeJS.Timeout | null = null;
@@ -18,6 +19,16 @@ export async function checkAndFireDueReminders(tts: TTSProvider): Promise<void> 
   try {
     const due = await getDueReminders(db, new Date());
     for (const reminder of due) {
+      // TTS is the last pipeline stage (STT -> LLM -> TTS). Until the shared
+      // readiness gate reports the full pipeline ready, skip spoken delivery and
+      // leave the reminder pending so it is retried once setup completes.
+      if (!isPipelineReady()) {
+        console.log(
+          `[Scheduler] Skipping spoken reminder #${reminder.id}: voice pipeline not ready yet (STT -> LLM -> TTS gate). Reminder stays pending.`
+        );
+        continue;
+      }
+
       const message = `Reminder: ${reminder.text}`;
       console.log(`[Scheduler] Firing due reminder #${reminder.id}: "${reminder.text}"`);
 
@@ -60,15 +71,4 @@ export function startReminderPolling(tts: TTSProvider): void {
   pollingIntervalId = setInterval(() => {
     checkAndFireDueReminders(tts);
   }, 30 * 1000);
-}
-
-/**
- * Stops active background reminder polling loop and releases timer resources.
- */
-export function stopReminderPolling(): void {
-  if (pollingIntervalId) {
-    clearInterval(pollingIntervalId);
-    pollingIntervalId = null;
-    console.log('[Scheduler] Stopped background reminder polling loop.');
-  }
 }

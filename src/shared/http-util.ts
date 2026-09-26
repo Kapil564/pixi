@@ -11,6 +11,17 @@ export async function isLocalServerReachable(url: string, timeout = 800): Promis
 }
 
 /**
+ * Throws a consistent error message when an HTTP response is not OK,
+ * including the provider label, status code, and response body.
+ */
+export async function assertOk(res: Response, providerLabel: string): Promise<void> {
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`${providerLabel} failed (${res.status}): ${errText || res.statusText}`);
+  }
+}
+
+/**
  * Executes an async task (such as a download or API operation) with automatic exponential backoff retries.
  */
 export async function executeWithExponentialBackoff<T>(

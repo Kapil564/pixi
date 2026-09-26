@@ -10,8 +10,6 @@ export interface UserSettings {
   apiKeys: {
     openai?: string;
     gemini?: string;
-    groq?: string;
-    fishaudio?: string;
     elevenlabs?: string;
   };
 }
@@ -33,32 +31,38 @@ function getMachineSecretKey(): string {
   return `pixi-secret:${user}@${host}`;
 }
 
-function obfuscateFallback(plainText: string): string {
-  const key = getMachineSecretKey();
-  const buffer = Buffer.from(plainText, 'utf-8');
+function xorTransform(buffer: Buffer, key: string): Buffer {
   const keyBuffer = Buffer.from(key, 'utf-8');
   const result = Buffer.alloc(buffer.length);
   for (let i = 0; i < buffer.length; i++) {
     result[i] = buffer[i] ^ keyBuffer[i % keyBuffer.length];
   }
-  return `obf:${result.toString('base64')}`;
+  return result;
+}
+
+function obfuscateFallback(plainText: string): string {
+  return `obf:${xorTransform(Buffer.from(plainText, 'utf-8'), getMachineSecretKey()).toString('base64')}`;
 }
 
 function deobfuscateFallback(obfText: string): string {
   if (!obfText.startsWith('obf:')) return obfText;
   try {
-    const rawBase64 = obfText.slice(4);
-    const buffer = Buffer.from(rawBase64, 'base64');
-    const key = getMachineSecretKey();
-    const keyBuffer = Buffer.from(key, 'utf-8');
-    const result = Buffer.alloc(buffer.length);
-    for (let i = 0; i < buffer.length; i++) {
-      result[i] = buffer[i] ^ keyBuffer[i % keyBuffer.length];
-    }
-    return result.toString('utf-8');
+    return xorTransform(Buffer.from(obfText.slice(4), 'base64'), getMachineSecretKey()).toString('utf-8');
   } catch {
     return obfText;
   }
+}
+
+function getSecureChannel(): { encryptString(s: string): Buffer; decryptString(b: Buffer): string } | null {
+  try {
+    const { app, safeStorage } = require('electron');
+    if (app && typeof app.isReady === 'function' && app.isReady() && safeStorage && safeStorage.isEncryptionAvailable()) {
+      return safeStorage;
+    }
+  } catch (err) {
+    console.warn('[Settings Store Warning] safeStorage unavailable:', err);
+  }
+  return null;
 }
 
 /**
@@ -68,14 +72,9 @@ function encryptSecret(secret?: string): string | undefined {
   if (!secret) return undefined;
   if (secret.startsWith('enc:') || secret.startsWith('obf:')) return secret; // Already encrypted
 
-  try {
-    const { app, safeStorage } = require('electron');
-    if (app && typeof app.isReady === 'function' && app.isReady() && safeStorage && safeStorage.isEncryptionAvailable()) {
-      const encryptedBuffer = safeStorage.encryptString(secret);
-      return `enc:${encryptedBuffer.toString('base64')}`;
-    }
-  } catch (err) {
-    console.warn('[Settings Store Warning] safeStorage encryption unavailable, using machine-bound obfuscation:', err);
+  const secureChannel = getSecureChannel();
+  if (secureChannel) {
+    return `enc:${secureChannel.encryptString(secret).toString('base64')}`;
   }
   return obfuscateFallback(secret);
 }
@@ -88,23 +87,38 @@ function decryptSecret(secret?: string): string | undefined {
   if (secret.startsWith('obf:')) return deobfuscateFallback(secret);
   if (!secret.startsWith('enc:')) return secret; // Unencrypted legacy plain text
 
-  try {
-    const { app, safeStorage } = require('electron');
-    if (app && typeof app.isReady === 'function' && app.isReady() && safeStorage && safeStorage.isEncryptionAvailable()) {
-      const base64Str = secret.slice(4);
-      const encryptedBuffer = Buffer.from(base64Str, 'base64');
-      return safeStorage.decryptString(encryptedBuffer);
-    }
-  } catch (err) {
-    console.warn('[Settings Store Warning] safeStorage decryption skipped:', err);
+  const secureChannel = getSecureChannel();
+  if (secureChannel) {
+    return secureChannel.decryptString(Buffer.from(secret.slice(4), 'base64'));
   }
   return secret;
 }
 
+let cachedSettings: UserSettings | null = null;
+
+function areSettingsEqual(a: UserSettings, b: UserSettings): boolean {
+  if (a.onboardingCompleted !== b.onboardingCompleted) return false;
+  if (a.mode !== b.mode) return false;
+  const keysA = a.apiKeys || {};
+  const keysB = b.apiKeys || {};
+  const allKeys = new Set([...Object.keys(keysA), ...Object.keys(keysB)]);
+  for (const k of allKeys) {
+    if ((keysA as Record<string, string | undefined>)[k] !== (keysB as Record<string, string | undefined>)[k]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Reads user settings from %APPDATA%\pixi\settings.json and syncs with runtime config.
+ * Caches settings in memory to avoid repeated synchronous disk reads and redundant config triggers.
  */
-export function getSettings(): UserSettings {
+export function getSettings(forceReload = false): UserSettings {
+  if (cachedSettings && !forceReload) {
+    return cachedSettings;
+  }
+
   const filePath = getSettingsFilePath();
   let loaded: UserSettings = DEFAULT_SETTINGS;
 
@@ -120,8 +134,6 @@ export function getSettings(): UserSettings {
         apiKeys: {
           openai: decryptSecret(rawKeys.openai),
           gemini: decryptSecret(rawKeys.gemini),
-          groq: decryptSecret(rawKeys.groq),
-          fishaudio: decryptSecret(rawKeys.fishaudio),
           elevenlabs: decryptSecret(rawKeys.elevenlabs),
         },
       };
@@ -130,12 +142,14 @@ export function getSettings(): UserSettings {
     console.warn('[Settings Store Error] Failed to read settings.json:', err);
   }
 
+  cachedSettings = loaded;
   applyUserSettingsToConfig(loaded);
   return loaded;
 }
 
 /**
  * Saves user settings to %APPDATA%\pixi\settings.json and syncs with runtime config.
+ * Skips disk writes and redundant notifications if the settings have not changed.
  */
 export function saveSettings(settings: Partial<UserSettings>): UserSettings {
   const current = getSettings();
@@ -145,6 +159,10 @@ export function saveSettings(settings: Partial<UserSettings>): UserSettings {
     apiKeys: { ...current.apiKeys, ...(settings.apiKeys || {}) },
   };
 
+  if (areSettingsEqual(current, updated)) {
+    return current;
+  }
+
   try {
     const filePath = getSettingsFilePath();
     const diskSettings = {
@@ -152,14 +170,13 @@ export function saveSettings(settings: Partial<UserSettings>): UserSettings {
       apiKeys: {
         openai: encryptSecret(updated.apiKeys.openai),
         gemini: encryptSecret(updated.apiKeys.gemini),
-        groq: encryptSecret(updated.apiKeys.groq),
-        fishaudio: encryptSecret(updated.apiKeys.fishaudio),
         elevenlabs: encryptSecret(updated.apiKeys.elevenlabs),
       },
     };
 
     fs.writeFileSync(filePath, JSON.stringify(diskSettings, null, 2), 'utf-8');
     console.log('[Settings Store] Successfully saved user settings to settings.json.');
+    cachedSettings = updated;
   } catch (err) {
     console.error('[Settings Store Error] Failed to write settings.json:', err);
     throw err instanceof Error ? err : new Error(`Failed to save settings: ${String(err)}`);

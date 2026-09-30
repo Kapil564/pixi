@@ -6,17 +6,18 @@ import { applyUserSettingsToConfig } from './config';
 
 export interface UserSettings {
   onboardingCompleted: boolean;
-  mode: 'offline' | 'cloud';
+  mode?: 'offline' | 'cloud' | 'custom';
   apiKeys: {
     openai?: string;
     gemini?: string;
+    opencode?: string;
     elevenlabs?: string;
   };
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
   onboardingCompleted: false,
-  mode: 'offline',
+  mode: 'custom',
   apiKeys: {},
 };
 
@@ -134,6 +135,7 @@ export function getSettings(forceReload = false): UserSettings {
         apiKeys: {
           openai: decryptSecret(rawKeys.openai),
           gemini: decryptSecret(rawKeys.gemini),
+          opencode: decryptSecret(rawKeys.opencode),
           elevenlabs: decryptSecret(rawKeys.elevenlabs),
         },
       };
@@ -170,6 +172,7 @@ export function saveSettings(settings: Partial<UserSettings>): UserSettings {
       apiKeys: {
         openai: encryptSecret(updated.apiKeys.openai),
         gemini: encryptSecret(updated.apiKeys.gemini),
+        opencode: encryptSecret(updated.apiKeys.opencode),
         elevenlabs: encryptSecret(updated.apiKeys.elevenlabs),
       },
     };
@@ -184,4 +187,21 @@ export function saveSettings(settings: Partial<UserSettings>): UserSettings {
 
   applyUserSettingsToConfig(updated);
   return updated;
+}
+
+/**
+ * Resets user settings and wipes stored API keys.
+ */
+export function resetUserSettings(): UserSettings {
+  const filePath = getSettingsFilePath();
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log('[Settings Store] Reset user settings: deleted settings.json');
+    }
+  } catch (err) {
+    console.warn('[Settings Store Error] Failed to delete settings.json during reset:', err);
+  }
+  cachedSettings = null;
+  return getSettings(true);
 }

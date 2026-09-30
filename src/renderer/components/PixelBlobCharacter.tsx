@@ -14,26 +14,26 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
   className = '',
   onClick,
 }) => {
-  // Catppuccin colors per phase
+  // Catppuccin vibrant pastel palette per phase
   const getBlobColors = () => {
     switch (phase) {
       case 'listening':
         return {
-          body: '#7cd092ff',      // Teal
+          body: '#a6e3a1',      // Vibrant mint green
           border: '#181825',
           blush: '#f38ba8',
           eye: '#11111b',
         };
       case 'thinking':
         return {
-          body: '#f9e2af',      // Yellow
+          body: '#f9e2af',      // Golden yellow
           border: '#181825',
           blush: '#f38ba8',
           eye: '#11111b',
         };
       case 'speaking':
         return {
-          body: '#f5c2e7',      // Pink
+          body: '#f5c2e7',      // Soft candy pink
           border: '#181825',
           blush: '#f38ba8',
           eye: '#11111b',
@@ -41,7 +41,7 @@ export const PixelBlobCharacter: React.FC<PixelBlobCharacterProps> = ({
       case 'idle':
       default:
         return {
-          body: '#fbfbfbe4',      // Lavender
+          body: '#b4befe',      // Vibrant soft lavender / periwinkle
           border: '#181825',
           blush: '#f38ba8',
           eye: '#11111b',

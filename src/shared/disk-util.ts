@@ -47,11 +47,32 @@ export function findLocalBinary(opts: FindLocalBinaryOptions): string | undefine
 
   const dir = opts.binDir || path.join(getAppPaths().userDataDir, 'bin');
   if (fs.existsSync(dir)) {
-    const defaultCandidates = ['whisper-cli.exe', 'whisper.exe', 'piper.exe', 'main.exe'];
+    const defaultCandidates = [
+      'whisper-cli.exe',
+      'whisper.exe',
+      'piper.exe',
+      'main.exe',
+      path.join('Release', 'whisper-cli.exe'),
+      path.join('Release', 'main.exe'),
+      path.join('piper', 'piper.exe'),
+    ];
     const candidates = opts.knownNames && opts.knownNames.length > 0 ? opts.knownNames : defaultCandidates;
     for (const name of candidates) {
       const full = path.join(dir, name);
       if (fs.existsSync(full)) return full;
+    }
+
+    if (opts.recursive) {
+      try {
+        const subdirs = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory());
+        for (const sub of subdirs) {
+          for (const name of candidates) {
+            const baseName = path.basename(name);
+            const full = path.join(dir, sub.name, baseName);
+            if (fs.existsSync(full)) return full;
+          }
+        }
+      } catch {}
     }
   }
 

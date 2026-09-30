@@ -1,16 +1,17 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-const providerSchema = z.enum(['openai', 'gemini', 'ollama']);
+const providerSchema = z.enum(['openai', 'gemini', 'opencode', 'ollama']);
 const sttSchema = z.enum(['openai', 'elevenlabs', 'whisper']);
 const ttsSchema = z.enum(['piper', 'elevenlabs']);
 
 const openAiKey = process.env.OPENAI_API_KEY || '';
 const geminiKey = process.env.GEMINI_API_KEY || '';
+const openCodeKey = process.env.OPENCODE_API_KEY || '';
 const elevenLabsKey = process.env.ELEVENLABS_API_KEY || '';
 
 const defaultStt = elevenLabsKey ? 'elevenlabs' : (openAiKey ? 'openai' : 'whisper');
-const defaultLlm = geminiKey ? 'gemini' : (openAiKey ? 'openai' : 'ollama');
+const defaultLlm = openCodeKey ? 'opencode' : (geminiKey ? 'gemini' : (openAiKey ? 'openai' : 'ollama'));
 const defaultTts = elevenLabsKey ? 'elevenlabs' : 'piper';
 
 export const config = {
@@ -30,7 +31,8 @@ export const config = {
     })(),
     openAiKey,
     geminiKey,
-    model: process.env.LLM_MODEL || 'gpt-4o-mini',
+    openCodeKey,
+    model: process.env.LLM_MODEL || (openCodeKey ? 'space-bunny-free' : 'gpt-4o-mini'),
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   },
   tts: {
@@ -54,10 +56,11 @@ let lastAppliedSignature = '';
  */
 export function applyUserSettingsToConfig(
   settings: {
-    mode?: 'offline' | 'cloud';
+    mode?: 'offline' | 'cloud' | 'custom';
     apiKeys?: {
       openai?: string;
       gemini?: string;
+      opencode?: string;
       elevenlabs?: string;
     };
   },
@@ -67,9 +70,10 @@ export function applyUserSettingsToConfig(
 
   const keys = settings.apiKeys || {};
   const currentSignature = JSON.stringify({
-    mode: settings.mode || 'default',
+    mode: settings.mode || 'custom',
     openai: keys.openai || '',
     gemini: keys.gemini || '',
+    opencode: keys.opencode || '',
     elevenlabs: keys.elevenlabs || '',
   });
 
@@ -78,37 +82,41 @@ export function applyUserSettingsToConfig(
   }
   lastAppliedSignature = currentSignature;
 
-  if (keys.openai) {
-    config.llm.openAiKey = keys.openai;
-    config.stt.openAiKey = keys.openai;
-  }
-  if (keys.gemini) {
-    config.llm.geminiKey = keys.gemini;
-  }
-  if (keys.elevenlabs) {
-    config.tts.elevenLabsKey = keys.elevenlabs;
-    config.stt.elevenLabsKey = keys.elevenlabs;
-  }
+  // Sync API keys to runtime config
+  config.llm.openAiKey = keys.openai || '';
+  config.stt.openAiKey = keys.openai || '';
+  config.llm.geminiKey = keys.gemini || '';
+  config.llm.openCodeKey = keys.opencode || '';
+  config.tts.elevenLabsKey = keys.elevenlabs || '';
+  config.stt.elevenLabsKey = keys.elevenlabs || '';
 
-  if (settings.mode === 'cloud') {
-    if (config.llm.openAiKey) {
-      config.llm.provider = 'openai';
-    } else if (config.llm.geminiKey) {
-      config.llm.provider = 'gemini';
-    }
-
-    if (config.stt.openAiKey) {
-      config.stt.provider = 'openai';
-    }
-
-    if (config.tts.elevenLabsKey) {
-      config.tts.provider = 'elevenlabs';
-    }
-  } else if (settings.mode === 'offline') {
-    config.llm.provider = 'ollama';
+  // Determine provider independently for each capability:
+  // 1. STT: OpenAI key -> openai, else ElevenLabs key -> elevenlabs, else local Whisper
+  if (config.stt.openAiKey) {
+    config.stt.provider = 'openai';
+  } else if (config.stt.elevenLabsKey) {
+    config.stt.provider = 'elevenlabs';
+  } else {
     config.stt.provider = 'whisper';
+  }
+
+  // 2. LLM: OpenCode key -> opencode, else Gemini key -> gemini, else OpenAI key -> openai, else local Ollama
+  if (config.llm.openCodeKey) {
+    config.llm.provider = 'opencode';
+  } else if (config.llm.geminiKey) {
+    config.llm.provider = 'gemini';
+  } else if (config.llm.openAiKey) {
+    config.llm.provider = 'openai';
+  } else {
+    config.llm.provider = 'ollama';
+  }
+
+  // 3. TTS: ElevenLabs key -> elevenlabs, else local Piper
+  if (config.tts.elevenLabsKey) {
+    config.tts.provider = 'elevenlabs';
+  } else {
     config.tts.provider = 'piper';
   }
 
-  console.log(`[Config Engine] Applied runtime user settings (mode=${settings.mode || 'default'}, llm=${config.llm.provider}, stt=${config.stt.provider}, tts=${config.tts.provider})`);
+  console.log(`[Config Engine] Applied runtime provider configuration: STT=${config.stt.provider}, LLM=${config.llm.provider}, TTS=${config.tts.provider}`);
 }

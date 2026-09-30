@@ -341,7 +341,7 @@ import { setSelectedModelName, downloadWhisperModel } from '../providers/whisper
 import { setSelectedVoiceName, downloadPiperVoice } from '../providers/piper-manager';
 import { getDatabaseStatus } from '../db';
 import { checkSystemRequirements } from '../shared/sys-check';
-import { getSettings, saveSettings } from '../shared/settings-store';
+import { getSettings, saveSettings, resetUserSettings } from '../shared/settings-store';
 
 ipcMain.handle('autostart:get', () => {
   return isAutostartEnabled();
@@ -397,6 +397,10 @@ ipcMain.handle('settings:get', () => {
 
 ipcMain.handle('settings:save', (_event, settings: any) => {
   return saveSettings(settings);
+});
+
+ipcMain.handle('settings:reset', () => {
+  return resetUserSettings();
 });
 
 ipcMain.handle('db:status', () => {

@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('assistant', {
   getSystemStatus: () => ipcRenderer.invoke('sys:status'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:save', settings),
+  resetSettings: () => ipcRenderer.invoke('settings:reset'),
   setSttModel: (modelName: string) => ipcRenderer.invoke('stt:set-model', modelName),
   setTtsVoice: (voiceName: string) => ipcRenderer.invoke('tts:set-voice', voiceName),
   onTranscript: (cb: (data: { text: string }) => void) =>

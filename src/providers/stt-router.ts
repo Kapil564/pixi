@@ -4,20 +4,22 @@ import {
   createPrimarySTTProvider,
   LocalWhisperSTT,
 } from './stt';
+
 export class STTRouter implements STTProvider {
   public name = 'stt-router';
+  private local: STTProvider;
 
-  constructor(
-    private primary: STTProvider | null,
-    private local: STTProvider
-  ) {}
+  constructor(local: STTProvider = new LocalWhisperSTT()) {
+    this.local = local;
+  }
 
   async transcribe(audioBuffer: Buffer): Promise<TranscriptionResult> {
-    if (this.primary) {
+    const primary = createPrimarySTTProvider();
+    if (primary) {
       try {
-        return await this.primary.transcribe(audioBuffer);
+        return await primary.transcribe(audioBuffer);
       } catch (err) {
-        console.warn(`[STT Router] Primary (${this.primary.name}) failed, falling back to local Whisper:`, err);
+        console.warn(`[STT Router] Primary (${primary.name}) failed, falling back to local Whisper:`, err);
       }
     }
     return this.local.transcribe(audioBuffer);
@@ -25,17 +27,8 @@ export class STTRouter implements STTProvider {
 }
 
 /**
- * Creates the STTRouter with primary cloud provider (ElevenLabs/OpenAI) and local Whisper fallback.
+ * Creates the STTRouter with dynamic primary cloud provider (ElevenLabs/OpenAI) and local Whisper fallback.
  */
 export function createSTTRouter(): STTProvider {
-  const primaryProvider = createPrimarySTTProvider();
-  const localProvider = new LocalWhisperSTT();
-
-  if (primaryProvider) {
-    console.log(`[STT Router] Initialized Primary provider "${primaryProvider.name}" with local Whisper fallback.`);
-    return new STTRouter(primaryProvider, localProvider);
-  }
-
-  console.log('[STT Router] No cloud STT key configured. Running 100% local via Whisper.');
-  return new STTRouter(null, localProvider);
+  return new STTRouter();
 }

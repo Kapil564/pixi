@@ -120,6 +120,7 @@ export class OpenAICompatibleLLM implements LLMProvider {
 
   async parseIntent(text: string, customSystemPrompt?: string): Promise<IntentResult> {
     const sysPrompt = getSystemPrompt(customSystemPrompt);
+    const extra = this.name === 'openai' ? { response_format: { type: 'json_object' } } : {};
     const data = await this.chat(
       [
         { role: 'system', content: sysPrompt },
@@ -127,7 +128,7 @@ export class OpenAICompatibleLLM implements LLMProvider {
       ],
       0.2,
       'LLM',
-      { response_format: { type: 'json_object' } },
+      extra,
     );
 
     const content = data.choices?.[0]?.message?.content;
@@ -241,6 +242,13 @@ export function createPrimaryLLMProvider(): LLMProvider | null {
   const provider = config.llm.provider;
 
   switch (provider) {
+    case 'opencode':
+      if (config.llm.openCodeKey) {
+        const model = process.env.OPENCODE_MODEL || (config.llm.model && config.llm.model !== 'gpt-4o-mini' && config.llm.model !== 'gemini-1.5-flash' ? config.llm.model : 'space-bunny-free');
+        return new OpenAICompatibleLLM('https://opencode.ai/zen/v1', config.llm.openCodeKey, model, 'opencode');
+      }
+      console.warn('[LLM] Provider forced to opencode but OPENCODE_API_KEY missing.');
+      return null;
     case 'gemini':
       if (config.llm.geminiKey) return new GeminiLLM(config.llm.geminiKey, config.llm.model);
       console.warn('[LLM] Provider forced to gemini but GEMINI_API_KEY missing.');

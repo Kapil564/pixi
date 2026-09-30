@@ -6,8 +6,7 @@ export interface OnboardingWizardProps {
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mode, setMode] = useState<'offline' | 'cloud'>('offline');
-  const [apiKeys, setApiKeys] = useState<{ openai?: string; gemini?: string; elevenlabs?: string }>({});
+  const [apiKeys, setApiKeys] = useState<{ openai?: string; gemini?: string; opencode?: string; elevenlabs?: string }>({});
   const [setupProgress, setSetupProgress] = useState<number>(0);
   const [setupText, setSetupText] = useState<string>('Initializing setup...');
   const [logs, setLogs] = useState<string[]>([]);
@@ -16,6 +15,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const assistant = (window as any).assistant;
+
+  useEffect(() => {
+    if (assistant?.getSettings) {
+      assistant
+        .getSettings()
+        .then((s: any) => {
+          if (s?.apiKeys) {
+            setApiKeys(s.apiKeys);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [assistant]);
 
   useEffect(() => {
     if (!assistant?.onSetupProgress) return;
@@ -43,31 +55,58 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
     }
   };
 
+  const isSttCloud = Boolean(apiKeys.openai?.trim() || apiKeys.elevenlabs?.trim());
+  const isLlmCloud = Boolean(apiKeys.opencode?.trim() || apiKeys.gemini?.trim() || apiKeys.openai?.trim());
+  const isTtsCloud = Boolean(apiKeys.elevenlabs?.trim());
+
+  const sttProviderName = apiKeys.openai?.trim()
+    ? 'OpenAI Cloud'
+    : apiKeys.elevenlabs?.trim()
+      ? 'ElevenLabs Cloud'
+      : 'Local Whisper';
+
+  const llmProviderName = apiKeys.opencode?.trim()
+    ? 'OpenCode (Cloud)'
+    : apiKeys.gemini?.trim()
+      ? 'Google Gemini'
+      : apiKeys.openai?.trim()
+        ? 'OpenAI Cloud'
+        : 'Local Ollama';
+
+  const ttsProviderName = apiKeys.elevenlabs?.trim() ? 'ElevenLabs Cloud' : 'Local Piper';
+
+  const localCount = (isSttCloud ? 0 : 1) + (isLlmCloud ? 0 : 1) + (isTtsCloud ? 0 : 1);
+
   const handleContinue = async () => {
-    if (mode === 'cloud') {
+    try {
+      if (assistant?.saveSettings) {
+        await assistant.saveSettings({
+          onboardingCompleted: localCount === 0,
+          mode: 'custom',
+          apiKeys,
+        });
+      }
+    } catch (err) {
+      console.error('[Onboarding] Failed to save settings:', err);
+    }
+
+    if (localCount === 0) {
+      // All capabilities are cloud-backed with API keys — no local downloads needed
       try {
-        if (assistant?.saveSettings) {
-          await assistant.saveSettings({ onboardingCompleted: true, mode: 'cloud', apiKeys });
-        }
         if (assistant?.resizeToOrb) {
           assistant.resizeToOrb();
         }
-      } catch (err) {
-        console.error('[Onboarding] Failed to save cloud settings:', err);
-      }
+      } catch {}
       onComplete();
       return;
     }
 
-    // Local mode setup sequence
+    // Local model setup sequence for any unconfigured capability
     setStep(2);
     setIsSettingUp(true);
     setSetupError(null);
 
     try {
-      if (assistant?.saveSettings) {
-        await assistant.saveSettings({ mode: 'offline' });
-      }
       if (assistant?.runSetupSequence) {
         const success = await assistant.runSetupSequence();
         if (success) {
@@ -105,7 +144,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   const finishOnboarding = async () => {
     try {
       if (assistant?.saveSettings) {
-        await assistant.saveSettings({ onboardingCompleted: true, mode: 'offline' });
+        await assistant.saveSettings({ onboardingCompleted: true, mode: 'custom', apiKeys });
       }
       if (assistant?.resizeToOrb) {
         assistant.resizeToOrb();
@@ -119,117 +158,133 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   return (
     <div className="w-full h-full p-2 select-none font-sans text-white box-border flex items-center justify-center">
       <div className="w-full h-full bg-black border border-neutral-800 rounded-2xl p-5 shadow-2xl flex flex-col justify-between box-border overflow-y-auto">
-        
         {/* Header with drag area */}
-        <div className="drag-region flex items-center justify-between border-b border-neutral-800 pb-3.5 shrink-0">
+        <div className="drag-region flex items-center justify-between border-b border-neutral-800 pb-3 shrink-0">
           <div className="flex items-center space-x-2.5">
             <div className="w-7 h-7 rounded-lg bg-white text-black flex items-center justify-center font-bold text-xs shadow-sm">
               P
             </div>
             <div>
               <h2 className="text-sm font-semibold tracking-tight text-white uppercase">pixi</h2>
-              <p className="text-[11px] text-neutral-400">Assistant Runtime Configuration</p>
+              <p className="text-[11px] text-neutral-400">AI Pipeline Configuration</p>
             </div>
           </div>
 
           <span className="no-drag text-[10px] font-mono tracking-wider px-2 py-0.5 rounded border border-neutral-800 text-neutral-400 bg-neutral-900">
-            {step === 1 ? 'MODE' : step === 2 ? 'SETUP' : 'READY'}
+            {step === 1 ? 'CONFIG' : step === 2 ? 'SETUP' : 'READY'}
           </span>
         </div>
 
-        {/* STEP 1: Mode Selection (Black & White Minimal) */}
+        {/* STEP 1: Per-Service Configuration */}
         {step === 1 && (
           <div className="no-drag flex flex-col space-y-3.5 w-full my-auto py-2">
             <div className="space-y-0.5">
-              <h3 className="text-sm font-medium text-white">Select Execution Mode</h3>
-              <p className="text-xs text-neutral-400">Choose between local private inference or cloud API providers.</p>
+              <h3 className="text-sm font-medium text-white">Configure AI Capabilities</h3>
+              <p className="text-xs text-neutral-400">
+                Provide API keys for cloud services, or leave blank to run that service locally on your device.
+              </p>
             </div>
 
-            {/* Option A: Local */}
-            <div
-              onClick={() => setMode('offline')}
-              className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
-                mode === 'offline'
-                  ? 'border-white bg-neutral-900/90 text-white'
-                  : 'border-neutral-800 bg-neutral-950/60 text-neutral-300 hover:border-neutral-700'
-              }`}
-            >
+            {/* STT Section */}
+            <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/70 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs tracking-wide">100% Local (Offline)</span>
-                {mode === 'offline' && (
-                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white text-black font-bold">
-                    Active
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                Runs entirely on your computer using local Ollama, Whisper, and Piper. Zero data leaves your machine.
-              </p>
-              <div className="mt-1.5 text-[10px] font-mono text-neutral-500">
-                Requires local model setup (~2.5 GB)
-              </div>
-            </div>
-
-            {/* Option B: Cloud */}
-            <div
-              onClick={() => setMode('cloud')}
-              className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
-                mode === 'cloud'
-                  ? 'border-white bg-neutral-900/90 text-white'
-                  : 'border-neutral-800 bg-neutral-950/60 text-neutral-300 hover:border-neutral-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs tracking-wide">Cloud Providers (API Keys)</span>
-                {mode === 'cloud' && (
-                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white text-black font-bold">
-                    Active
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                Fast inference connecting OpenAI, Google Gemini, or ElevenLabs APIs. Instant startup with zero model downloads.
-              </p>
-
-              {/* Cloud API Key Inputs */}
-              {mode === 'cloud' && (
-                <div
-                  className="mt-2.5 pt-2.5 border-t border-neutral-800 space-y-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="text-[11px] font-medium text-neutral-300 block">Configure API Keys:</span>
-                  <input
-                    type="password"
-                    placeholder="OpenAI API Key (sk-...)"
-                    value={apiKeys.openai || ''}
-                    onChange={(e) => setApiKeys({ ...apiKeys, openai: e.target.value })}
-                    className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
-                  />
-                  <input
-                    type="password"
-                    placeholder="Google Gemini API Key"
-                    value={apiKeys.gemini || ''}
-                    onChange={(e) => setApiKeys({ ...apiKeys, gemini: e.target.value })}
-                    className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
-                  />
-                  <input
-                    type="password"
-                    placeholder="ElevenLabs API Key (Optional for TTS/STT)"
-                    value={apiKeys.elevenlabs || ''}
-                    onChange={(e) => setApiKeys({ ...apiKeys, elevenlabs: e.target.value })}
-                    className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
-                  />
+                <div>
+                  <span className="font-semibold text-xs tracking-wide block">1. Speech Recognition (STT)</span>
+                  <span className="text-[10px] text-neutral-400">Transcribes your voice input</span>
                 </div>
-              )}
+                <span
+                  className={`text-[9px] uppercase font-mono px-2 py-0.5 rounded font-medium border ${
+                    isSttCloud
+                      ? 'bg-emerald-950/60 border-emerald-700 text-emerald-400'
+                      : 'bg-neutral-900 border-neutral-700 text-neutral-300'
+                  }`}
+                >
+                  {sttProviderName}
+                </span>
+              </div>
+              <input
+                type="password"
+                placeholder="OpenAI API Key (sk-...) • blank for local Whisper"
+                value={apiKeys.openai || ''}
+                onChange={(e) => setApiKeys({ ...apiKeys, openai: e.target.value })}
+                className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
+              />
             </div>
 
-            {/* Submit Button */}
-            <button
-              onClick={handleContinue}
-              className="w-full py-2.5 rounded-xl bg-white text-black font-semibold text-xs tracking-wide hover:bg-neutral-200 transition-colors shadow-sm mt-1"
-            >
-              {mode === 'cloud' ? 'Save & Start pixi →' : 'Continue to Local Setup →'}
-            </button>
+            {/* LLM Section */}
+            <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-xs tracking-wide block">2. Intelligence & Reasoning (LLM)</span>
+                  <span className="text-[10px] text-neutral-400">Parses requests & triggers actions</span>
+                </div>
+                <span
+                  className={`text-[9px] uppercase font-mono px-2 py-0.5 rounded font-medium border ${
+                    isLlmCloud
+                      ? 'bg-emerald-950/60 border-emerald-700 text-emerald-400'
+                      : 'bg-neutral-900 border-neutral-700 text-neutral-300'
+                  }`}
+                >
+                  {llmProviderName}
+                </span>
+              </div>
+              <input
+                type="password"
+                placeholder="OpenCode API Key (oc_sk_...) • priority cloud LLM"
+                value={apiKeys.opencode || ''}
+                onChange={(e) => setApiKeys({ ...apiKeys, opencode: e.target.value })}
+                className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
+              />
+              <input
+                type="password"
+                placeholder="Google Gemini API Key (AIzaSy...) • blank for local Ollama"
+                value={apiKeys.gemini || ''}
+                onChange={(e) => setApiKeys({ ...apiKeys, gemini: e.target.value })}
+                className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
+              />
+            </div>
+
+            {/* TTS Section */}
+            <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-xs tracking-wide block">3. Speech Synthesis (TTS)</span>
+                  <span className="text-[10px] text-neutral-400">Speaks audio responses back</span>
+                </div>
+                <span
+                  className={`text-[9px] uppercase font-mono px-2 py-0.5 rounded font-medium border ${
+                    isTtsCloud
+                      ? 'bg-emerald-950/60 border-emerald-700 text-emerald-400'
+                      : 'bg-neutral-900 border-neutral-700 text-neutral-300'
+                  }`}
+                >
+                  {ttsProviderName}
+                </span>
+              </div>
+              <input
+                type="password"
+                placeholder="ElevenLabs API Key • blank for local Piper voice"
+                value={apiKeys.elevenlabs || ''}
+                onChange={(e) => setApiKeys({ ...apiKeys, elevenlabs: e.target.value })}
+                className="w-full bg-black border border-neutral-800 focus:border-white rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-600 outline-none transition-colors"
+              />
+            </div>
+
+            {/* Overview & Action Button */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-2 px-1">
+                <span>Active configuration:</span>
+                <span className="font-mono text-neutral-300">
+                  {localCount === 0 ? 'All Cloud (No Downloads)' : `${localCount} Local / ${3 - localCount} Cloud`}
+                </span>
+              </div>
+              <button
+                onClick={handleContinue}
+                className="w-full py-2.5 rounded-xl bg-white text-black font-semibold text-xs tracking-wide hover:bg-neutral-200 transition-colors shadow-sm"
+              >
+                {localCount === 0 ? 'Save & Start pixi →' : `Continue with ${localCount} Local Setup →`}
+              </button>
+            </div>
           </div>
         )}
 
@@ -237,8 +292,25 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
         {step === 2 && (
           <div className="no-drag flex flex-col space-y-4 w-full my-auto py-2">
             <div className="space-y-0.5">
-              <h3 className="text-sm font-medium text-white">Configuring Local Offline Models</h3>
-              <p className="text-xs text-neutral-400">Downloading Ollama, Whisper, and Piper components...</p>
+              <h3 className="text-sm font-medium text-white">Configuring Local Components</h3>
+              <p className="text-xs text-neutral-400">
+                Setting up local models for unconfigured services ({localCount} required)...
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
+                <span className="text-[10px] text-neutral-400 block font-mono">STT</span>
+                <span className="text-xs font-semibold text-white">{sttProviderName}</span>
+              </div>
+              <div className="p-2 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
+                <span className="text-[10px] text-neutral-400 block font-mono">LLM</span>
+                <span className="text-xs font-semibold text-white">{llmProviderName}</span>
+              </div>
+              <div className="p-2 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
+                <span className="text-[10px] text-neutral-400 block font-mono">TTS</span>
+                <span className="text-xs font-semibold text-white">{ttsProviderName}</span>
+              </div>
             </div>
 
             <div className="space-y-2 p-4 rounded-xl border border-neutral-800 bg-neutral-950">
@@ -279,7 +351,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
               </button>
 
               {showLogs && (
-                <div className="mt-2 p-3 bg-black rounded-xl border border-neutral-800 max-h-32 overflow-y-auto font-mono text-[10px] text-neutral-400 space-y-1">
+                <div className="mt-2 p-3 bg-black rounded-xl border border-neutral-800 max-h-28 overflow-y-auto font-mono text-[10px] text-neutral-400 space-y-1">
                   {logs.length > 0 ? (
                     logs.map((line, idx) => <div key={idx} className="break-words">{line}</div>)
                   ) : (
@@ -309,14 +381,33 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-white">pixi is Ready</h3>
               <p className="text-xs text-neutral-400 leading-relaxed max-w-sm mx-auto">
-                Your assistant is configured. You can interact via voice or text anytime.
+                Your hybrid voice assistant is configured and ready for interactions.
               </p>
             </div>
 
-            <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800 text-left text-xs space-y-1.5 text-neutral-300">
+            <div className="grid grid-cols-3 gap-2 text-left">
+              <div className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-950">
+                <span className="text-[10px] text-neutral-500 font-mono block">STT</span>
+                <span className="text-xs font-semibold text-white truncate block">{sttProviderName}</span>
+              </div>
+              <div className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-950">
+                <span className="text-[10px] text-neutral-500 font-mono block">LLM</span>
+                <span className="text-xs font-semibold text-white truncate block">{llmProviderName}</span>
+              </div>
+              <div className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-950">
+                <span className="text-[10px] text-neutral-500 font-mono block">TTS</span>
+                <span className="text-xs font-semibold text-white truncate block">{ttsProviderName}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-left text-xs space-y-1.5 text-neutral-300">
               <div className="font-medium text-white text-[11px] mb-1">Quick Shortcuts:</div>
-              <div>• <span className="font-mono text-white bg-neutral-900 border border-neutral-800 px-1 py-0.5 rounded text-[10px]">Ctrl + Shift + Space</span> to toggle pixi</div>
-              <div>• Say <span className="font-mono text-white bg-neutral-900 border border-neutral-800 px-1 py-0.5 rounded text-[10px]">"Hey pixi"</span> to wake with voice</div>
+              <div>
+                • <span className="font-mono text-white bg-neutral-900 border border-neutral-800 px-1 py-0.5 rounded text-[10px]">Ctrl + Shift + Space</span> to toggle pixi
+              </div>
+              <div>
+                • Say <span className="font-mono text-white bg-neutral-900 border border-neutral-800 px-1 py-0.5 rounded text-[10px]">"Hey pixi"</span> to wake with voice
+              </div>
             </div>
 
             <button
@@ -327,8 +418,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
             </button>
           </div>
         )}
-
       </div>
     </div>
   );
 };
+

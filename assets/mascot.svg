@@ -1,36 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%" shape-rendering="crispEdges">
   <!-- Sleeping Z letters (Idle State) -->
   <g id="idle-z">
-    <path d="M 21 6 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#a3a3a3" />
-    <path d="M 23 3 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#d4d4d4" />
+    <path d="M 21 6 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#cba6f7" />
+    <path d="M 23 3 h 4 v 1 l -3 2 h 3 v 1 h -4 v -1 l 3 -2 h -3 z" fill="#b4befe" />
   </g>
 
   <!-- Main Blob Character Body -->
   <g id="blob-body">
     <!-- Dark Pixel Outline -->
-    <rect x="4" y="11" width="24" height="17" rx="4" fill="#0a0a0a" />
+    <rect x="4" y="11" width="24" height="17" rx="4" fill="#181825" />
 
     <!-- Main Blob Body Color Fill -->
-    <rect x="5" y="12" width="22" height="15" rx="3" fill="#f5f5f5" />
+    <rect x="5" y="12" width="22" height="15" rx="3" fill="#b4befe" />
 
     <!-- Top-Left Specular Pixel Highlight -->
     <rect x="7" y="13" width="8" height="2" fill="#ffffff" opacity="0.4" />
 
     <!-- Left Arm -->
-    <rect x="2" y="18" width="3" height="5" rx="1" fill="#0a0a0a" />
-    <rect x="3" y="19" width="2" height="4" rx="0.5" fill="#f5f5f5" />
+    <rect x="2" y="18" width="3" height="5" rx="1" fill="#181825" />
+    <rect x="3" y="19" width="2" height="4" rx="0.5" fill="#b4befe" />
 
     <!-- Right Arm -->
-    <rect x="27" y="18" width="3" height="5" rx="1" fill="#0a0a0a" />
-    <rect x="27" y="19" width="2" height="4" rx="0.5" fill="#f5f5f5" />
+    <rect x="27" y="18" width="3" height="5" rx="1" fill="#181825" />
+    <rect x="27" y="19" width="2" height="4" rx="0.5" fill="#b4befe" />
 
-    <!-- Gray Cheeks (Blush) -->
-    <rect x="7" y="20" width="3.5" height="2" fill="#737373" />
-    <rect x="21.5" y="20" width="3.5" height="2" fill="#737373" />
+    <!-- Pink Cheeks (Blush) -->
+    <rect x="7" y="20" width="3.5" height="2" fill="#f38ba8" />
+    <rect x="21.5" y="20" width="3.5" height="2" fill="#f38ba8" />
 
     <!-- Idle Face: Dot Eyes & Cute Mouth -->
-    <rect x="10" y="17" width="3" height="3" fill="#0a0a0a" />
-    <rect x="19" y="17" width="3" height="3" fill="#0a0a0a" />
-    <rect x="15" y="21" width="2" height="1.5" fill="#0a0a0a" />
+    <rect x="10" y="17" width="3" height="3" fill="#11111b" />
+    <rect x="19" y="17" width="3" height="3" fill="#11111b" />
+    <rect x="15" y="21" width="2" height="1.5" fill="#11111b" />
   </g>
 </svg>
